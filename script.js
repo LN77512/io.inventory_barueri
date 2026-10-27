@@ -25,7 +25,7 @@
  * ========================================================================== */
 
 /** URL da implantação (Web App) do Google Apps Script. */
-const GAS_URL = "https://script.google.com/macros/s/AKfycbxAvmBtLUPQpeiJepc6xYhB-2vH60TnJUBnmVDtgaQcIBj124BpYSB3sH6bu3zRY6ubjA/exec";
+const GAS_URL = "https://script.google.com/macros/s/AKfycbx6ubLw4yvvBwA-CoOv2UGraSuCUEidoyWX9W4TIEw8mp6NKXpHh7yLF31DHYUV6KRH/exec";
 
 /** Token de sessão devolvido pelo servidor no login. Vai em toda requisição. */
 let token = null;
