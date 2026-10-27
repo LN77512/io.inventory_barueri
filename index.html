@@ -1,739 +1,596 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
-
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>THALES Information Systems - Inventário</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>THALES Information Systems - Inventário</title>
+    <!-- Biblioteca Chart.js para o Dashboard Gráfico -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Biblioteca leve para exportação em Excel nativo (.xlsx) -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <!-- Bibliotecas para exportação em PDF -->
+    <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
+    <style>
+        /* Estilos Gerais */
+        body {
+          font-family: Arial, sans-serif;
+          background-color: #002b5c;
+          margin: 0;
+          padding: 0;
+          color: #333;
+        }
 
-  <!-- Chart.js: desenha o gráfico de rosca do resumo do inventário -->
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <!-- SheetJS: gera o arquivo Excel (.xlsx) no próprio navegador -->
-  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+        /* MODAIS DE LOGIN E SEGURANÇA */
+        .login-overlay {
+          position: fixed;
+          top: 0;
+          left: 0;
+          width: 100%;
+          height: 100%;
+          background-color: rgba(0, 43, 92, 0.85);
+          display: flex;
+          justify-content: center;
+          align-items: center;
+          z-index: 9999;
+        }
 
-  <style>
-    /* ==========================================================
-       1. ESTILOS GERAIS
-       ========================================================== */
-    body {
-      font-family: Arial, sans-serif;
-      background-color: #002b5c;
-      margin: 0;
-      padding: 0;
-      color: #333;
-    }
+        .login-card {
+          background-color: #ffffff;
+          padding: 30px 40px;
+          border-radius: 10px;
+          box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+          width: 100%;
+          max-width: 400px;
+          text-align: center;
+          position: relative;
+        }
 
-    /* ==========================================================
-       2. MODAIS (login, segurança, primeiro acesso, gráfico, exclusão)
-       Todos reutilizam .login-overlay (fundo) e .login-card (caixa).
-       O JavaScript alterna o "display" para abrir/fechar.
-       ========================================================== */
-    .login-overlay {
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background-color: rgba(0, 43, 92, 0.85);
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      z-index: 9999;
-    }
+        .login-card h2 {
+          color: #002b5c;
+          margin-bottom: 5px;
+          font-size: 1.8em;
+          letter-spacing: 1px;
+        }
 
-    .login-card {
-      background-color: #ffffff;
-      padding: 30px 40px;
-      border-radius: 10px;
-      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
-      width: 100%;
-      max-width: 400px;
-      text-align: center;
-      position: relative;
-    }
+        .login-subtitle {
+          color: #666;
+          font-size: 0.85em;
+          margin-bottom: 25px;
+          line-height: 1.4;
+        }
 
-    .login-card h2 {
-      color: #002b5c;
-      margin-bottom: 5px;
-      font-size: 1.8em;
-      letter-spacing: 1px;
-    }
+        .input-group {
+          margin-bottom: 15px;
+          text-align: left;
+        }
 
-    .login-subtitle {
-      color: #666;
-      font-size: 0.85em;
-      margin-bottom: 25px;
-      line-height: 1.4;
-    }
+        .input-group label {
+          display: block;
+          font-weight: bold;
+          color: #333;
+          margin-bottom: 5px;
+          font-size: 0.9em;
+        }
 
-    .input-group {
-      margin-bottom: 15px;
-      text-align: left;
-    }
+        .input-group input {
+          width: 100%;
+          padding: 10px;
+          border: 1px solid #ccc;
+          border-radius: 5px;
+          box-sizing: border-box;
+          font-size: 1em;
+        }
 
-    .input-group label {
-      display: block;
-      font-weight: bold;
-      color: #333;
-      margin-bottom: 5px;
-      font-size: 0.9em;
-    }
+        .btn-login {
+          width: 100%;
+          padding: 12px;
+          background-color: #002b5c;
+          color: #fff;
+          border: none;
+          border-radius: 5px;
+          font-size: 1em;
+          font-weight: bold;
+          cursor: pointer;
+          margin-top: 10px;
+          transition: background-color 0.2s;
+        }
 
-    .input-group input {
-      width: 100%;
-      padding: 10px;
-      border: 1px solid #ccc;
-      border-radius: 5px;
-      box-sizing: border-box;
-      font-size: 1em;
-    }
+        .btn-login:hover {
+          background-color: #001a38;
+        }
 
-    .btn-login {
-      width: 100%;
-      padding: 12px;
-      background-color: #002b5c;
-      color: #fff;
-      border: none;
-      border-radius: 5px;
-      font-size: 1em;
-      font-weight: bold;
-      cursor: pointer;
-      margin-top: 10px;
-      transition: background-color 0.2s;
-    }
+        /* MODAL DO GRÁFICO E EXCLUSÃO */
+        .btn-fechar-modal {
+          position: absolute;
+          top: 12px;
+          right: 15px;
+          background: none;
+          border: none;
+          font-size: 22px;
+          font-weight: bold;
+          color: #888;
+          cursor: pointer;
+        }
 
-    .btn-login:hover {
-      background-color: #001a38;
-    }
+        .btn-fechar-modal:hover {
+          color: #000;
+        }
 
-    /* Botão "X" no canto do modal do gráfico */
-    .btn-fechar-modal {
-      position: absolute;
-      top: 12px;
-      right: 15px;
-      background: none;
-      border: none;
-      font-size: 22px;
-      font-weight: bold;
-      color: #888;
-      cursor: pointer;
-    }
+        /* APLICATIVO / INVENTÁRIO */
+        .app-container {
+          max-width: 1400px;
+          margin: 30px auto;
+          padding: 20px;
+          background-color: #ffffff;
+          border-radius: 8px;
+          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
 
-    .btn-fechar-modal:hover {
-      color: #000;
-    }
+        header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          border-bottom: 2px solid #eaeaea;
+          padding-bottom: 10px;
+          margin-bottom: 25px;
+        }
 
-    /* ==========================================================
-       3. APLICATIVO (cartão branco principal e cabeçalho)
-       ========================================================== */
-    .app-container {
-      max-width: 1400px;
-      margin: 30px auto;
-      padding: 20px;
-      background-color: #ffffff;
-      border-radius: 8px;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-    }
+        header h1 {
+          color: #002b5c;
+          font-size: 1.6em;
+          margin: 0;
+        }
 
-    header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      border-bottom: 2px solid #eaeaea;
-      padding-bottom: 10px;
-      margin-bottom: 25px;
-    }
+        .user-badge {
+          font-size: 0.9em;
+          color: #555;
+          display: flex;
+          align-items: center;
+          gap: 10px;
+        }
 
-    header h1 {
-      color: #002b5c;
-      font-size: 1.6em;
-      margin: 0;
-    }
+        .btn-logout {
+          background-color: #6c757d;
+          color: white;
+          border: none;
+          padding: 6px 12px;
+          border-radius: 4px;
+          cursor: pointer;
+          font-size: 0.85em;
+        }
 
-    .user-badge {
-      font-size: 0.9em;
-      color: #555;
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
+        /* NAVEGAÇÃO ENTRE INVENTÁRIO E HISTÓRICO */
+        .nav-tabs {
+          display: flex;
+          gap: 10px;
+          margin-bottom: 20px;
+        }
 
-    .btn-logout {
-      background-color: #6c757d;
-      color: white;
-      border: none;
-      padding: 6px 12px;
-      border-radius: 4px;
-      cursor: pointer;
-      font-size: 0.85em;
-    }
+        .tab-btn {
+          padding: 10px 20px;
+          background-color: #e9ecef;
+          border: none;
+          border-radius: 5px;
+          cursor: pointer;
+          font-weight: bold;
+          color: #495057;
+        }
 
-    /* ==========================================================
-       4. ABAS (Inventário / Histórico)
-       ========================================================== */
-    .nav-tabs {
-      display: flex;
-      gap: 10px;
-      margin-bottom: 20px;
-    }
+        .tab-btn.active {
+          background-color: #002b5c;
+          color: white;
+        }
 
-    .tab-btn {
-      padding: 10px 20px;
-      background-color: #e9ecef;
-      border: none;
-      border-radius: 5px;
-      cursor: pointer;
-      font-weight: bold;
-      color: #495057;
-    }
+        /* ALERTAS DE ESTOQUE MÍNIMO */
+        .alerta-estoque {
+          background-color: #f8d7da;
+          color: #842029;
+          border: 1px solid #f5c2c7;
+          padding: 12px;
+          border-radius: 6px;
+          margin-bottom: 20px;
+          font-size: 0.9em;
+          display: none;
+        }
 
-    .tab-btn.active {
-      background-color: #002b5c;
-      color: white;
-    }
+        /* FORMULÁRIO DE REGISTO */
+        .form-container {
+          display: flex;
+          gap: 10px;
+          margin-bottom: 20px;
+          flex-wrap: wrap;
+          background-color: #f8f9fa;
+          padding: 15px;
+          border-radius: 6px;
+          border: 1px solid #e0e0e0;
+        }
 
-    /* ==========================================================
-       5. ALERTA DE ESTOQUE CRÍTICO (oculto até o JS exibir)
-       ========================================================== */
-    .alerta-estoque {
-      background-color: #f8d7da;
-      color: #842029;
-      border: 1px solid #f5c2c7;
-      padding: 12px;
-      border-radius: 6px;
-      margin-bottom: 20px;
-      font-size: 0.9em;
-      display: none;
-    }
+        .form-container input,
+        .form-container select {
+          flex: 1;
+          min-width: 160px;
+          padding: 10px 12px;
+          border: 1px solid #ccc;
+          border-radius: 4px;
+          font-size: 0.9em;
+          box-sizing: border-box;
+        }
 
-    /* ==========================================================
-       6. FORMULÁRIO DE CADASTRO / EDIÇÃO
-       ========================================================== */
-    .form-container {
-      display: flex;
-      gap: 10px;
-      margin-bottom: 20px;
-      flex-wrap: wrap;
-      background-color: #f8f9fa;
-      padding: 15px;
-      border-radius: 6px;
-      border: 1px solid #e0e0e0;
-    }
+        #nome {
+          flex: 1.6;
+          min-width: 220px;
+        }
 
-    .form-container input,
-    .form-container select {
-      flex: 1;
-      min-width: 160px;
-      padding: 10px 12px;
-      border: 1px solid #ccc;
-      border-radius: 4px;
-      font-size: 0.9em;
-      box-sizing: border-box;
-    }
+        .btn-adicionar {
+          background-color: #28a745;
+          color: white;
+          border: none;
+          padding: 10px 20px;
+          border-radius: 4px;
+          font-weight: bold;
+          cursor: pointer;
+          transition: background-color 0.2s;
+        }
 
-    /* O campo "Nome" é mais largo que os demais */
-    #nome {
-      flex: 1.6;
-      min-width: 220px;
-    }
+        .btn-adicionar:hover {
+          background-color: #218838;
+        }
 
-    .btn-adicionar {
-      background-color: #28a745;
-      color: white;
-      border: none;
-      padding: 10px 20px;
-      border-radius: 4px;
-      font-weight: bold;
-      cursor: pointer;
-      transition: background-color 0.2s;
-    }
+        /* BARRA DE FERRAMENTAS E EXPORTAÇÃO */
+        .toolbar-container {
+          margin-bottom: 15px;
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          gap: 15px;
+          flex-wrap: wrap;
+        }
 
-    .btn-adicionar:hover {
-      background-color: #218838;
-    }
+        .toolbar-container input[type="text"] {
+          width: 350px;
+          min-width: 250px;
+          padding: 10px 14px;
+          border: 2px solid #002b5c;
+          border-radius: 5px;
+          font-size: 0.95em;
+          box-sizing: border-box;
+          outline: none;
+        }
 
-    /* ==========================================================
-       7. BARRA DE FERRAMENTAS (busca, filtro de datas, exportação)
-       ========================================================== */
-    .toolbar-container {
-      margin-bottom: 15px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      gap: 15px;
-      flex-wrap: wrap;
-    }
+        .date-filter-group {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          font-size: 0.9em;
+          font-weight: bold;
+          color: #495057;
+        }
 
-    .toolbar-container input[type="text"] {
-      width: 350px;
-      min-width: 250px;
-      padding: 10px 14px;
-      border: 2px solid #002b5c;
-      border-radius: 5px;
-      font-size: 0.95em;
-      box-sizing: border-box;
-      outline: none;
-    }
+        .date-filter-group input[type="date"] {
+          padding: 8px;
+          border: 1px solid #ccc;
+          border-radius: 4px;
+          font-size: 0.9em;
+        }
 
-    .date-filter-group {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      font-size: 0.9em;
-      font-weight: bold;
-      color: #495057;
-    }
+        .export-buttons {
+          display: flex;
+          gap: 8px;
+          white-space: nowrap;
+        }
 
-    .date-filter-group input[type="date"] {
-      padding: 8px;
-      border: 1px solid #ccc;
-      border-radius: 4px;
-      font-size: 0.9em;
-    }
+        .btn-excel {
+          background-color: #1d6f42;
+          color: white;
+          border: none;
+          padding: 10px 14px;
+          border-radius: 5px;
+          font-weight: bold;
+          font-size: 0.88em;
+          cursor: pointer;
+        }
 
-    .export-buttons {
-      display: flex;
-      gap: 8px;
-      white-space: nowrap;
-    }
+        .btn-pdf {
+          background-color: #dc3545;
+          color: white;
+          border: none;
+          padding: 10px 14px;
+          border-radius: 5px;
+          font-weight: bold;
+          font-size: 0.88em;
+          cursor: pointer;
+        }
 
-    .btn-excel,
-    .btn-pdf,
-    .btn-grafico {
-      color: white;
-      border: none;
-      padding: 10px 14px;
-      border-radius: 5px;
-      font-weight: bold;
-      font-size: 0.88em;
-      cursor: pointer;
-    }
+        .btn-grafico {
+          background-color: #002b5c;
+          color: white;
+          border: none;
+          padding: 10px 14px;
+          border-radius: 5px;
+          font-weight: bold;
+          font-size: 0.88em;
+          cursor: pointer;
+        }
 
-    .btn-excel   { background-color: #1d6f42; }
-    .btn-pdf     { background-color: #dc3545; }
-    .btn-grafico { background-color: #002b5c; }
+        /* TABELA */
+        .table-responsive {
+          overflow-x: auto;
+        }
 
-    /* ==========================================================
-       8. TABELAS
-       ========================================================== */
-    .table-responsive {
-      overflow-x: auto;
-    }
+        table {
+          width: 100%;
+          border-collapse: collapse;
+          margin-top: 10px;
+          text-align: left;
+        }
 
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      margin-top: 10px;
-      text-align: left;
-    }
+        th, td {
+          padding: 12px 10px;
+          border-bottom: 1px solid #ddd;
+          font-size: 0.9em;
+        }
 
-    th,
-    td {
-      padding: 12px 10px;
-      border-bottom: 1px solid #ddd;
-      font-size: 0.9em;
-    }
+        th {
+          background-color: #343a40;
+          color: white;
+          font-weight: bold;
+          white-space: nowrap;
+        }
 
-    th {
-      background-color: #343a40;
-      color: white;
-      font-weight: bold;
-      white-space: nowrap;
-    }
+        tr:hover {
+          background-color: #f1f1f1;
+        }
 
-    tr:hover {
-      background-color: #f1f1f1;
-    }
+        /* DESTAQUE DE CRÍTICO NA TABELA (VERMELHO CLARO) */
+        tr.linha-critica {
+          background-color: #f8d7da;
+          color: #842029;
+        }
 
-    /* Linha de item com estoque crítico (vermelho claro) */
-    tr.linha-critica {
-      background-color: #f8d7da;
-      color: #842029;
-    }
+        .badge-critico {
+          background-color: #dc3545;
+          color: white;
+          padding: 3px 8px;
+          border-radius: 10px;
+          font-size: 0.75em;
+          font-weight: bold;
+          margin-left: 6px;
+        }
 
-    .badge-critico {
-      background-color: #dc3545;
-      color: white;
-      padding: 3px 8px;
-      border-radius: 10px;
-      font-size: 0.75em;
-      font-weight: bold;
-      margin-left: 6px;
-    }
+        /* BOTÕES DE AÇÃO */
+        .btn-editar {
+          background-color: #ffc107;
+          color: #333;
+          border: none;
+          padding: 6px 12px;
+          border-radius: 4px;
+          cursor: pointer;
+          font-size: 0.85em;
+          font-weight: bold;
+          margin-right: 5px;
+        }
 
-    /* Botões "Editar" e "Remover" de cada linha */
-    .btn-editar {
-      background-color: #ffc107;
-      color: #333;
-      border: none;
-      padding: 6px 12px;
-      border-radius: 4px;
-      cursor: pointer;
-      font-size: 0.85em;
-      font-weight: bold;
-      margin-right: 5px;
-    }
+        .btn-remover {
+          background-color: #dc3545;
+          color: white;
+          border: none;
+          padding: 6px 12px;
+          border-radius: 4px;
+          cursor: pointer;
+          font-size: 0.85em;
+          font-weight: bold;
+        }
 
-    .btn-remover {
-      background-color: #dc3545;
-      color: white;
-      border: none;
-      padding: 6px 12px;
-      border-radius: 4px;
-      cursor: pointer;
-      font-size: 0.85em;
-    }
-
-    /* ==========================================================
-       8.1 PAGINAÇÃO (controles abaixo de cada tabela)
-       ========================================================== */
-    .paginacao {
-      display: flex;
-      justify-content: flex-end;
-      align-items: center;
-      gap: 12px;
-      margin-top: 14px;
-      font-size: 0.9em;
-      color: #495057;
-    }
-
-    .paginacao select {
-      padding: 4px 6px;
-      border: 1px solid #ccc;
-      border-radius: 4px;
-      font-size: 0.95em;
-    }
-
-    .btn-pag {
-      padding: 8px 14px;
-      background-color: #ffffff;
-      border: 1px solid #ccc;
-      border-radius: 4px;
-      font-size: 0.95em;
-      cursor: pointer;
-    }
-
-    .btn-pag:hover:not(:disabled) {
-      background-color: #f1f1f1;
-    }
-
-    .btn-pag:disabled {
-      color: #999;
-      background-color: #e9ecef;
-      cursor: not-allowed;
-    }
-
-    /* ==========================================================
-       9. IMPRESSÃO / EXPORTAR PDF (A4 paisagem)
-       Esconde tudo o que não é tabela. A coluna "Ações" é
-       identificada pela classe .col-acoes (somente no inventário),
-       assim a coluna "Detalhes" do histórico continua visível.
-       ========================================================== */
-    @page {
-      size: A4 landscape;
-      margin: 10mm;
-    }
-
-    @media print {
-      body {
-        background-color: #ffffff !important;
-        color: #000 !important;
-      }
-
-      .login-overlay,
-      .form-container,
-      .toolbar-container,
-      .nav-tabs,
-      .user-badge,
-      .alerta-estoque,
-      .paginacao,
-      .col-acoes {
-        display: none !important;
-      }
-
-      .app-container {
-        box-shadow: none !important;
-        margin: 0 !important;
-        padding: 0 !important;
-        max-width: 100% !important;
-      }
-
-      table {
-        width: 100% !important;
-        border-collapse: collapse !important;
-      }
-
-      th,
-      td {
-        font-size: 10px !important;
-        padding: 6px 4px !important;
-        border: 1px solid #444 !important;
-      }
-
-      th {
-        background-color: #002b5c !important;
-        color: #ffffff !important;
-      }
-    }
-  </style>
+        /* IMPRESSÃO NATIVA (A4 LANDSCAPE) */
+        @page { size: A4 landscape; margin: 10mm; }
+        @media print {
+          body { background-color: #ffffff !important; color: #000 !important; }
+          .login-overlay, .form-container, .toolbar-container, .nav-tabs, .user-badge, .col-acoes, td:last-child, th:last-child {
+            display: none !important;
+          }
+          .app-container { box-shadow: none !important; margin: 0 !important; padding: 0 !important; max-width: 100% !important; }
+          table { width: 100% !important; border-collapse: collapse !important; }
+          th, td { font-size: 10px !important; padding: 6px 4px !important; border: 1px solid #444 !important; }
+          th { background-color: #002b5c !important; color: #ffffff !important; }
+        }
+    </style>
 </head>
-
 <body>
 
-  <!-- ============================================================
-       MODAL 1: LOGIN
-       Aparece ao abrir o sistema. O botão chama tentarLoginDireto().
-       ============================================================ -->
-  <div id="login-modal" class="login-overlay">
-    <div class="login-card">
-      <h2>THALES</h2>
-      <p class="login-subtitle">INFORMATION SYSTEMS<br>Insira suas credenciais para aceder</p>
-
-      <div>
-        <div class="input-group">
-          <label for="usr-field">Utilizador:</label>
-          <input type="text" id="usr-field" required autocomplete="off">
+    <!-- MODAL DE LOGIN -->
+    <div id="login-modal" class="login-overlay">
+        <div class="login-card">
+            <h2>THALES</h2>
+            <p class="login-subtitle">INFORMATION SYSTEMS<br>Insira suas credenciais para aceder</p>
+            <div>
+                <div class="input-group">
+                    <label for="usr-field">Utilizador:</label>
+                    <input type="text" id="usr-field" required autocomplete="off">
+                </div>
+                <div class="input-group">
+                    <label for="pwd-field">Palavra-passe:</label>
+                    <input type="password" id="pwd-field" required autocomplete="off">
+                </div>
+                <button type="button" onclick="tentarLoginDireto()" class="btn-login">Entrar</button>
+            </div>
         </div>
-        <div class="input-group">
-          <label for="pwd-field">Palavra-passe:</label>
-          <input type="password" id="pwd-field" required autocomplete="off">
-        </div>
-        <button type="button" onclick="tentarLoginDireto()" class="btn-login">Entrar</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- ============================================================
-       MODAL 2: CÓDIGO DE SEGURANÇA
-       Exibido apenas no primeiro acesso, antes de criar a conta.
-       ============================================================ -->
-  <div id="security-code-modal" class="login-overlay" style="display: none;">
-    <div class="login-card">
-      <h2>SEGURANÇA</h2>
-      <p class="login-subtitle">Insira o código de acesso autorizado para continuar.</p>
-
-      <form onsubmit="validarCodigoSeguranca(event)">
-        <div class="input-group">
-          <label for="sec-code-field">Código de Acesso:</label>
-          <input type="password" id="sec-code-field" required autocomplete="off">
-        </div>
-        <button type="submit" class="btn-login">Verificar Código</button>
-      </form>
-    </div>
-  </div>
-
-  <!-- ============================================================
-       MODAL 3: PRIMEIRO ACESSO
-       Define o utilizador e a palavra-passe definitivos.
-       ============================================================ -->
-  <div id="first-access-modal" class="login-overlay" style="display: none;">
-    <div class="login-card">
-      <h2>PRIMEIRO ACESSO</h2>
-      <p class="login-subtitle">É necessário definir o seu novo utilizador e palavra-passe para continuar.</p>
-
-      <form onsubmit="salvarNovaCredencial(event)">
-        <div class="input-group">
-          <label for="new-usr-field">Novo Nome de Utilizador:</label>
-          <input type="text" id="new-usr-field" required autocomplete="off">
-        </div>
-        <div class="input-group">
-          <label for="new-pwd-field">Nova Palavra-passe:</label>
-          <input type="password" id="new-pwd-field" required autocomplete="off">
-        </div>
-        <button type="submit" class="btn-login">Atualizar e Aceder</button>
-      </form>
-    </div>
-  </div>
-
-  <!-- ============================================================
-       MODAL 4: GRÁFICO DE RESUMO
-       O gráfico é desenhado no <canvas> por atualizarDashboard().
-       ============================================================ -->
-  <div id="chart-modal" class="login-overlay" style="display: none;">
-    <div class="login-card" style="max-width: 450px;">
-      <button type="button" class="btn-fechar-modal" onclick="fecharModalGrafico()">&times;</button>
-      <h3 style="color: #002b5c; margin-top: 0;">Resumo do Inventário</h3>
-      <div style="max-width: 320px; margin: 0 auto;">
-        <canvas id="statusChart"></canvas>
-      </div>
-    </div>
-  </div>
-
-  <!-- ============================================================
-       MODAL 5: CONFIRMAÇÃO DE REMOÇÃO
-       Pede a palavra-passe de remoção (conferida no servidor).
-       ============================================================ -->
-  <div id="delete-modal" class="login-overlay" style="display: none;">
-    <div class="login-card">
-      <h2>CONFIRMAÇÃO</h2>
-      <p id="delete-modal-subtitle" class="login-subtitle">Insira a palavra-passe para remover o item.</p>
-
-      <form onsubmit="confirmarRemocaoModal(event)">
-        <div class="input-group">
-          <label for="delete-pwd-field">Palavra-passe:</label>
-          <input type="password" id="delete-pwd-field" required autocomplete="off">
-        </div>
-        <div style="display: flex; gap: 10px; margin-top: 15px;">
-          <button type="button" onclick="fecharModalDelecao()" class="btn-login" style="background-color: #6c757d;">Cancelar</button>
-          <button type="submit" class="btn-login" style="background-color: #dc3545; margin-top: 0;">Confirmar</button>
-        </div>
-      </form>
-    </div>
-  </div>
-
-  <!-- ============================================================
-       APLICATIVO PRINCIPAL
-       Oculto até o login ser concluído (iniciarSessao()).
-       ============================================================ -->
-  <div id="app-container" class="app-container" style="display: none;">
-
-    <!-- Cabeçalho: título, utilizador logado e botão Sair -->
-    <header>
-      <h1>THALES Information Systems - Inventário</h1>
-      <div class="user-badge">
-        <span>👤 Utilizador: <strong id="logged-user-name">-</strong> (<span id="logged-user-role">-</span>)</span>
-        <button onclick="logout()" class="btn-logout">Sair</button>
-      </div>
-    </header>
-
-    <!-- Abas -->
-    <div class="nav-tabs">
-      <button id="tab-inv-btn" class="tab-btn active" onclick="mudarAba('inventario')">📦 Inventário</button>
-      <button id="tab-hist-btn" class="tab-btn" onclick="mudarAba('historico')">📜 Histórico de Movimentações</button>
     </div>
 
-    <!-- Aviso de estoque crítico (o texto é reescrito pelo JS) -->
-    <div id="alerta-estoque" class="alerta-estoque">
-      ⚠️ <strong>Atenção:</strong> Existem itens com o estoque total ou disponível no limite crítico!
+    <!-- MODAL DE CÓDIGO DE SEGURANÇA -->
+    <div id="security-code-modal" class="login-overlay" style="display: none;">
+        <div class="login-card">
+            <h2>SEGURANÇA</h2>
+            <p class="login-subtitle">Insira o código de acesso autorizado para continuar.</p>
+            <form onsubmit="validarCodigoSeguranca(event)">
+                <div class="input-group">
+                    <label for="sec-code-field">Código de Acesso:</label>
+                    <input type="password" id="sec-code-field" required autocomplete="off">
+                </div>
+                <button type="submit" class="btn-login">Verificar Código</button>
+            </form>
+        </div>
     </div>
 
-    <!-- ----------------------------------------------------------
-         VISÃO 1: INVENTÁRIO
-         ---------------------------------------------------------- -->
-    <div id="visao-inventario">
-
-      <!-- Formulário de cadastro/edição (o campo oculto "item-id" indica edição) -->
-      <form id="inventory-form" onsubmit="salvarItem(event)" class="form-container">
-        <input type="hidden" id="item-id">
-        <input type="text" id="nome" placeholder="Nome do Equipamento" required autocomplete="off">
-        <input type="text" id="marca" placeholder="Marca" required autocomplete="off">
-        <input type="text" id="modelo" placeholder="Modelo" required autocomplete="off">
-        <input type="number" id="quantidade" placeholder="Quantidade" required min="0" autocomplete="off">
-        <input type="number" id="quantidade_estoque" placeholder="Estoque Total" required min="0" autocomplete="off">
-        <select id="status" required>
-          <option value="" disabled selected>Selecione o Status</option>
-          <option value="Disponível">Disponível</option>
-          <option value="Em Uso">Em Uso</option>
-          <option value="Manutenção">Manutenção</option>
-        </select>
-        <input type="text" id="responsavel" placeholder="Responsável" required autocomplete="off">
-        <button type="submit" id="btn-submit" class="btn-adicionar">Adicionar</button>
-      </form>
-
-      <!-- Busca, gráfico e exportações do inventário -->
-      <div class="toolbar-container">
-        <input type="text" id="search-input" placeholder="🔍 Pesquisar em qualquer coluna..." autocomplete="off">
-        <div class="export-buttons">
-          <button type="button" onclick="abrirModalGrafico()" class="btn-grafico">📈 Ver Gráfico</button>
-          <button type="button" onclick="exportarExcel()" class="btn-excel">📊 Exportar Excel (.xlsx)</button>
-          <button type="button" onclick="exportarPDF()" class="btn-pdf">📄 Exportar PDF</button>
+    <!-- MODAL DE PRIMEIRO ACESSO -->
+    <div id="first-access-modal" class="login-overlay" style="display: none;">
+        <div class="login-card">
+            <h2>PRIMEIRO ACESSO</h2>
+            <p class="login-subtitle">É necessário definir o seu novo utilizador e palavra-passe para continuar.</p>
+            <form onsubmit="salvarNovaCredencial(event)">
+                <div class="input-group">
+                    <label for="new-usr-field">Novo Nome de Utilizador:</label>
+                    <input type="text" id="new-usr-field" required autocomplete="off">
+                </div>
+                <div class="input-group">
+                    <label for="new-pwd-field">Nova Palavra-passe:</label>
+                    <input type="password" id="new-pwd-field" required autocomplete="off">
+                </div>
+                <button type="submit" class="btn-login">Atualizar e Aceder</button>
+            </form>
         </div>
-      </div>
-
-      <!-- Tabela de inventário (linhas geradas por processarEExibirDados()) -->
-      <div class="table-responsive">
-        <table>
-          <thead>
-            <tr>
-              <th>Nome</th>
-              <th>Marca</th>
-              <th>Modelo</th>
-              <th>Quantidade</th>
-              <th>Estoque Total</th>
-              <th>Status</th>
-              <th>Responsável</th>
-              <th>Data</th>
-              <th>Hora</th>
-              <th class="col-acoes">Ações</th>
-            </tr>
-          </thead>
-          <tbody id="inventory-body"></tbody>
-        </table>
-      </div>
-
-      <!-- Paginação: linhas por página e navegação entre páginas -->
-      <div class="paginacao" id="inv-paginacao">
-        <label>Linhas:
-          <select id="inv-pag-linhas" onchange="mudarTamanhoPagina('inventory-body', this.value)">
-            <option value="10" selected>10</option>
-            <option value="25">25</option>
-            <option value="50">50</option>
-            <option value="100">100</option>
-          </select>
-        </label>
-        <button type="button" id="inv-pag-ant" class="btn-pag" onclick="mudarPagina('inventory-body', -1)">Anterior</button>
-        <span id="inv-pag-info">Página 1 de 1</span>
-        <button type="button" id="inv-pag-prox" class="btn-pag" onclick="mudarPagina('inventory-body', 1)">Próxima</button>
-      </div>
     </div>
 
-    <!-- ----------------------------------------------------------
-         VISÃO 2: HISTÓRICO DE MOVIMENTAÇÕES
-         ---------------------------------------------------------- -->
-    <div id="visao-historico" style="display: none;">
-
-      <!-- Busca por texto, filtro por período e exportações -->
-      <div class="toolbar-container">
-        <input type="text" id="search-history-input" placeholder="🔍 Pesquisar no histórico..." autocomplete="off">
-
-        <div class="date-filter-group">
-          <label>De: <input type="date" id="filtro-data-inicio" onchange="filtrarHistorico(true)"></label>
-          <label>Até: <input type="date" id="filtro-data-fim" onchange="filtrarHistorico(true)"></label>
+    <!-- MODAL DO GRÁFICO DE STATUS -->
+    <div id="chart-modal" class="login-overlay" style="display: none;">
+        <div class="login-card" style="max-width: 450px;">
+            <button type="button" class="btn-fechar-modal" onclick="fecharModalGrafico()">&times;</button>
+            <h3 style="color: #002b5c; margin-top: 0;">Resumo do Inventário</h3>
+            <div style="max-width: 320px; margin: 0 auto;">
+                <canvas id="statusChart"></canvas>
+            </div>
         </div>
-
-        <div class="export-buttons">
-          <button type="button" onclick="exportarExcel()" class="btn-excel">📊 Exportar Excel (.xlsx)</button>
-          <button type="button" onclick="exportarPDF()" class="btn-pdf">📄 Exportar PDF</button>
-        </div>
-      </div>
-
-      <!-- Tabela de histórico (linhas geradas por carregarHistorico()) -->
-      <div class="table-responsive">
-        <table>
-          <thead>
-            <tr>
-              <th>Data/Hora</th>
-              <th>Utilizador</th>
-              <th>Ação</th>
-              <th>Item</th>
-              <th>Modelo</th>
-              <th>Detalhes</th>
-            </tr>
-          </thead>
-          <tbody id="history-body"></tbody>
-        </table>
-      </div>
-
-      <!-- Paginação: linhas por página e navegação entre páginas -->
-      <div class="paginacao" id="hist-paginacao">
-        <label>Linhas:
-          <select id="hist-pag-linhas" onchange="mudarTamanhoPagina('history-body', this.value)">
-            <option value="10" selected>10</option>
-            <option value="25">25</option>
-            <option value="50">50</option>
-            <option value="100">100</option>
-          </select>
-        </label>
-        <button type="button" id="hist-pag-ant" class="btn-pag" onclick="mudarPagina('history-body', -1)">Anterior</button>
-        <span id="hist-pag-info">Página 1 de 1</span>
-        <button type="button" id="hist-pag-prox" class="btn-pag" onclick="mudarPagina('history-body', 1)">Próxima</button>
-      </div>
     </div>
-  </div>
 
-  <!-- Lógica do sistema. Aumente o número após "?v=" a cada alteração
-       do script para forçar os navegadores a baixar a versão nova. -->
-  <script src="script.js?v=6.2"></script>
+    <!-- MODAL DE CONFIRMAÇÃO DE EXCLUSÃO -->
+    <div id="delete-modal" class="login-overlay" style="display: none;">
+        <div class="login-card">
+            <h2>CONFIRMAÇÃO</h2>
+            <p id="delete-modal-subtitle" class="login-subtitle">Insira a palavra-passe para remover o item.</p>
+            <form onsubmit="confirmarRemocaoModal(event)">
+                <div class="input-group">
+                    <label for="delete-pwd-field">Palavra-passe:</label>
+                    <input type="password" id="delete-pwd-field" required autocomplete="off">
+                </div>
+                <div style="display: flex; gap: 10px; margin-top: 15px;">
+                    <button type="button" onclick="fecharModalDelecao()" class="btn-login" style="background-color: #6c757d;">Cancelar</button>
+                    <button type="submit" class="btn-login" style="background-color: #dc3545; margin-top: 0;">Confirmar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- APLICATIVO / INVENTÁRIO -->
+    <div id="app-container" class="app-container" style="display: none;">
+        <header>
+            <h1>THALES Information Systems - Inventário</h1>
+            <div class="user-badge">
+                <span>👤 Utilizador: <strong id="logged-user-name">-</strong> (<span id="logged-user-role">-</span>)</span>
+                <button onclick="logout()" class="btn-logout">Sair</button>
+            </div>
+        </header>
+
+        <!-- Navegação por Abas -->
+        <div class="nav-tabs">
+            <button id="tab-inv-btn" class="tab-btn active" onclick="mudarAba('inventario')">📦 Inventário</button>
+            <button id="tab-hist-btn" class="tab-btn" onclick="mudarAba('historico')">📜 Histórico de Movimentações</button>
+        </div>
+
+        <!-- Alerta Dinâmico de Estoque Mínimo -->
+        <div id="alerta-estoque" class="alerta-estoque">
+            ⚠️ <strong>Atenção:</strong> Existem itens com o estoque disponível no limite crítico!
+        </div>
+
+        <!-- VISÃO 1: INVENTÁRIO -->
+        <div id="visao-inventario">
+            <!-- Formulário de Registo / Edição -->
+            <form id="inventory-form" onsubmit="salvarItem(event)" class="form-container">
+                <input type="hidden" id="item-id">
+                <input type="text" id="nome" placeholder="Nome do Equipamento" required autocomplete="off">
+                <input type="text" id="marca" placeholder="Marca" required autocomplete="off">
+                <input type="text" id="modelo" placeholder="Modelo" required autocomplete="off">
+                <input type="number" id="quantidade" placeholder="Quantidade" required min="0" autocomplete="off">
+                <input type="number" id="quantidade_estoque" placeholder="Estoque Total" required min="0" autocomplete="off">
+                <select id="status" required>
+                    <option value="" disabled selected>Selecione o Status</option>
+                    <option value="Disponível">Disponível</option>
+                    <option value="Em Uso">Em Uso</option>
+                    <option value="Manutenção">Manutenção</option>
+                </select>
+                <input type="text" id="responsavel" placeholder="Responsável" required autocomplete="off">
+                <button type="submit" id="btn-submit" class="btn-adicionar">Adicionar</button>
+            </form>
+
+            <!-- Barra de Ferramentas -->
+            <div class="toolbar-container">
+                <input type="text" id="search-input" placeholder="🔍 Pesquisar em qualquer coluna..." autocomplete="off">
+                <div class="export-buttons">
+                    <button type="button" onclick="abrirModalGrafico()" class="btn-grafico">📈 Ver Gráfico</button>
+                    <button type="button" onclick="exportarExcel()" class="btn-excel">📊 Exportar Excel (.xlsx)</button>
+                    <button type="button" onclick="exportarPDF()" class="btn-pdf">📄 Exportar PDF</button>
+                </div>
+            </div>
+
+            <!-- Tabela de Inventário -->
+            <div class="table-responsive">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Nome</th>
+                            <th>Marca</th>
+                            <th>Modelo</th>
+                            <th>Quantidade</th>
+                            <th>Estoque Total</th>
+                            <th>Status</th>
+                            <th>Responsável</th>
+                            <th>Data</th>
+                            <th>Hora</th>
+                            <th class="col-acoes">Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody id="inventory-body">
+                        <!-- Dados injetados via JS -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- VISÃO 2: HISTÓRICO DE MOVIMENTAÇÕES -->
+        <div id="visao-historico" style="display: none;">
+            <div class="toolbar-container" style="flex-wrap: wrap;">
+                <input type="text" id="search-history-input" placeholder="🔍 Pesquisar no histórico..." autocomplete="off">
+                
+                <div class="date-filter-group">
+                    <label>De: <input type="date" id="filtro-data-inicio" onchange="filtrarHistorico()"></label>
+                    <label>Até: <input type="date" id="filtro-data-fim" onchange="filtrarHistorico()"></label>
+                </div>
+
+                <div class="export-buttons">
+                    <button type="button" onclick="exportarExcel()" class="btn-excel">📊 Exportar Excel (.xlsx)</button>
+                    <button type="button" onclick="exportarPDF()" class="btn-pdf">📄 Exportar PDF</button>
+                </div>
+            </div>
+
+            <div class="table-responsive">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Data/Hora</th>
+                            <th>Utilizador</th>
+                            <th>Ação</th>
+                            <th>Item</th>
+                            <th>Modelo</th>
+                            <th>Detalhes</th>
+                        </tr>
+                    </thead>
+                    <tbody id="history-body">
+                        <!-- Histórico injetado via JS -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js?v=11.0"></script>
 </body>
-
 </html>
