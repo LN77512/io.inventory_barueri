@@ -254,14 +254,32 @@ function processarEExibirDados(data) {
   const grupos = agrupar(data);
   let temCritico = false;
 
+  // NOVO: soma das quantidades de todas as linhas do mesmo nome+marca+modelo
+  const somas = {};
+  data.forEach(item => {
+    if (!low(item.nome)) return;
+    const k = chaveDe(item);
+    somas[k] = (somas[k] || 0) + (parseInt(item.quantidade) || 0);
+  });
+  const avisosExcesso = {}; // NOVO
+
   data.forEach(item => {
     if (!low(item.nome)) return;
     const g = grupos[chaveDe(item)];
     const critico = g.estoque - g.uso - g.manut <= 5;
     if (critico) temCritico = true;
 
+    // NOVO: soma do grupo maior que o estoque total
+    const soma = somas[chaveDe(item)];
+    const excedido = soma > g.estoque;
+    if (excedido) {
+      avisosExcesso[chaveDe(item)] =
+        `${esc(item.nome)} / ${esc(item.marca)} / ${esc(item.modelo)}: quantidade ${soma} &gt; estoque ${g.estoque}`;
+    }
+
     const tr = document.createElement("tr");
     if (critico) tr.classList.add("linha-critica");
+    if (excedido) tr.classList.add("linha-excedida"); // NOVO
     tr.innerHTML = `
       <td>${esc(item.nome)} ${critico ? '<span class="badge-critico">Crítico</span>' : ""}</td>
       <td>${esc(item.marca)}</td>
@@ -283,6 +301,16 @@ function processarEExibirDados(data) {
   if (alerta) {
     alerta.style.display = temCritico ? "block" : "none";
     if (temCritico) alerta.innerHTML = "⚠️ <strong>Atenção! Existem produtos com o estoque disponível no limite crítico.</strong>";
+  }
+
+  // NOVO: aviso de quantidade maior que o estoque
+  const alertaExcesso = el("alerta-excesso");
+  if (alertaExcesso) {
+    const lista = Object.values(avisosExcesso);
+    alertaExcesso.style.display = lista.length ? "block" : "none";
+    alertaExcesso.innerHTML = lista
+      .map(t => `⚠️ <strong>Atenção: quantidade maior que o estoque!</strong> (${t})`)
+      .join("<br>");
   }
 
   filtrarTabela();

@@ -358,6 +358,24 @@
           margin-left: 6px;
         }
 
+        /* LINHAS COM QUANTIDADE MAIOR QUE O ESTOQUE */
+        tr.linha-excedida {
+          background-color: #f1aeb5;
+          color: #58151c;
+          font-weight: bold;
+        }
+
+        .alerta-excesso {
+          background-color: #f8d7da;
+          color: #842029;
+          border: 1px solid #f5c2c7;
+          padding: 12px;
+          border-radius: 6px;
+          margin-bottom: 20px;
+          font-size: 0.9em;
+          display: none;
+        }
+
         /* BOTÕES DE AÇÃO */
         .btn-editar {
           background-color: #ffc107;
@@ -501,6 +519,9 @@
             ⚠️ <strong>Atenção:</strong> Existem itens com o estoque disponível no limite crítico!
         </div>
 
+        <!-- Alerta de quantidade maior que o estoque -->
+        <div id="alerta-excesso" class="alerta-excesso"></div>
+
         <!-- VISÃO 1: INVENTÁRIO -->
         <div id="visao-inventario">
             <!-- Formulário de Registo / Edição -->
@@ -591,6 +612,6 @@
         </div>
     </div>
 
-    <script src="script.js?v=11.0"></script>
+    <script src="script.js?v=12.0"></script>
 </body>
 </html>
