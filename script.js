@@ -205,7 +205,10 @@ function agrupar(data) {
   const g = {};
   data.forEach(item => {
     if (!low(item.nome)) return;
-    const x = (g[chaveDe(item)] ||= { estoque: 0, uso: 0, manut: 0 });
+    const x = (g[chaveDe(item)] ||= { estoque: 0, uso: 0, manut: 0, alerta: "" });
+    const a = low(item.alerta);
+    if (a === "nao") x.alerta = "nao";
+    else if (a === "sim" && x.alerta !== "nao") x.alerta = "sim";
     const q = parseInt(item.quantidade) || 0;
     x.estoque = Math.max(x.estoque, parseInt(item.quantidade_estoque) || 0);
     const st = norm(item.status);
@@ -254,22 +257,22 @@ function processarEExibirDados(data) {
   const grupos = agrupar(data);
   let temCritico = false;
 
-  // NOVO: soma das quantidades de todas as linhas do mesmo nome+marca+modelo
+  // Soma das quantidades de todas as linhas do mesmo nome+marca+modelo
   const somas = {};
   data.forEach(item => {
     if (!low(item.nome)) return;
     const k = chaveDe(item);
     somas[k] = (somas[k] || 0) + (parseInt(item.quantidade) || 0);
   });
-  const avisosExcesso = {}; // NOVO
+  const avisosExcesso = {};
 
   data.forEach(item => {
     if (!low(item.nome)) return;
     const g = grupos[chaveDe(item)];
-    const critico = g.estoque - g.uso - g.manut <= 5;
+    const critico = g.estoque - g.uso - g.manut <= 5 && g.alerta !== "nao";
     if (critico) temCritico = true;
 
-    // NOVO: soma do grupo maior que o estoque total
+    // Soma do grupo maior que o estoque total
     const soma = somas[chaveDe(item)];
     const excedido = soma > g.estoque;
     if (excedido) {
@@ -279,9 +282,9 @@ function processarEExibirDados(data) {
 
     const tr = document.createElement("tr");
     if (critico) tr.classList.add("linha-critica");
-    if (excedido) tr.classList.add("linha-excedida"); // NOVO
+    if (excedido) tr.classList.add("linha-excedida");
     tr.innerHTML = `
-      <td>${esc(item.nome)} ${critico ? '<span class="badge-critico">Crítico</span>' : ""}</td>
+      <td>${esc(item.nome)} ${critico ? '<span class="badge-critico">Crítico</span>' : ""}${g.alerta === "sim" ? '<span class="badge-critico" style="background-color:#fd7e14;">🔔 Alerta</span>' : ""}</td>
       <td>${esc(item.marca)}</td>
       <td>${esc(item.modelo)}</td>
       <td>${esc(item.quantidade || "0")}</td>
@@ -303,7 +306,7 @@ function processarEExibirDados(data) {
     if (temCritico) alerta.innerHTML = "⚠️ <strong>Atenção! Existem produtos com o estoque disponível no limite crítico.</strong>";
   }
 
-  // NOVO: aviso de quantidade maior que o estoque
+  // Aviso de quantidade maior que o estoque
   const alertaExcesso = el("alerta-excesso");
   if (alertaExcesso) {
     const lista = Object.values(avisosExcesso);
@@ -395,6 +398,13 @@ async function salvarItem(event) {
   });
   processarEExibirDados(dadosInventarioGlobal);
 
+  // Decide já se precisa perguntar e abre o modal na hora (sem esperar o servidor)
+  const disponivel = gSim.estoque - gSim.uso - gSim.manut;
+  const gAtual = agrupar(dadosInventarioGlobal)[chaveGrupo];
+  const decisao = gAtual ? gAtual.alerta : "";
+  const precisaPerguntar = disponivel <= 5 && !decisao;
+  const perguntaPromise = precisaPerguntar ? perguntarAlerta(campos, disponivel) : null;
+
   try {
     const r = await api({ action: idExistente ? "UPDATE" : "ADD", sheet: "inventario", id: registro.id, data: registro });
     if (r.erro) throw new Error(r.erro);
@@ -409,10 +419,63 @@ async function salvarItem(event) {
     } else {
       registrarHistorico("ADICIONOU", campos.nome, campos.modelo, `Qtd Inicial: ${campos.quantidade}, Estoque: ${campos.quantidade_estoque}, Status: ${campos.status}`);
     }
+
+    // Aviso de estoque crítico (disponível <= 5): pergunta Sim/Não uma vez por grupo
+    if (precisaPerguntar) {
+      const sim = await perguntaPromise;
+      await definirAlertaGrupo(chaveGrupo, sim ? "sim" : "nao");
+      registrarHistorico("ALERTA", campos.nome, campos.modelo,
+        sim ? "Alerta de estoque crítico ativado" : "Alerta de estoque crítico dispensado");
+    } else if (disponivel > 5 && decisao) {
+      // Estoque voltou ao normal: limpa a decisão para perguntar de novo numa próxima queda
+      await definirAlertaGrupo(chaveGrupo, "");
+    }
   } catch (err) {
+    const mAlerta = el("alert-modal");
+    if (mAlerta) mAlerta.style.display = "none";
     if (err.message !== "sessao") alert("Erro ao salvar no servidor. Os dados serão recarregados.");
   }
   carregarItens();
+}
+
+// Modal de alerta (mesmo visual do modal de confirmação) com botões Sim e Não
+function perguntarAlerta(c, disponivel) {
+  return new Promise(resolve => {
+    let m = el("alert-modal");
+    if (!m) {
+      m = document.createElement("div");
+      m.id = "alert-modal";
+      m.className = "login-overlay";
+      m.style.display = "none";
+      m.innerHTML = `
+        <div class="login-card">
+          <h2>ESTOQUE CRÍTICO</h2>
+          <p id="alert-modal-subtitle" class="login-subtitle"></p>
+          <p class="login-subtitle" style="color:#333;font-weight:bold;">Deseja colocar um alerta nele?</p>
+          <div style="display: flex; gap: 10px; margin-top: 15px;">
+            <button type="button" id="alert-btn-nao" class="btn-login" style="background-color: #6c757d;">Não</button>
+            <button type="button" id="alert-btn-sim" class="btn-login" style="background-color: #dc3545; margin-top: 0;">Sim</button>
+          </div>
+        </div>`;
+      document.body.appendChild(m);
+    }
+    el("alert-modal-subtitle").textContent =
+      `O item "${c.nome}" (${c.marca} / ${c.modelo}) está em estoque crítico! Disponível: ${disponivel}.`;
+    const fechar = resposta => { esconder("alert-modal"); resolve(resposta); };
+    el("alert-btn-sim").onclick = () => fechar(true);
+    el("alert-btn-nao").onclick = () => fechar(false);
+    mostrar("alert-modal");
+  });
+}
+
+// Grava "sim", "nao" ou "" na coluna alerta de todas as linhas do mesmo nome+marca+modelo
+async function definirAlertaGrupo(chave, valor) {
+  const linhas = dadosInventarioGlobal.filter(i => chaveDe(i) === chave);
+  linhas.forEach(i => { i.alerta = valor; });
+  processarEExibirDados(dadosInventarioGlobal); // mostra a cor na hora
+  for (const i of linhas) {
+    await api({ action: "UPDATE", sheet: "inventario", id: i.id, data: { alerta: valor } });
+  }
 }
 
 function removerItem(id) {
@@ -621,7 +684,7 @@ function exportarExcel() {
   Array.from(tbody.rows).forEach(tr => {
     if (tr.dataset.filtrado === "1") return;
     const cols = Array.from(tr.cells).slice(0, inv ? -1 : undefined);
-    dados.push(cols.map(td => td.textContent.replace("Crítico", "").trim()));
+    dados.push(cols.map(td => td.textContent.replace("Crítico", "").replace("🔔 Alerta", "").trim()));
   });
 
   const ws = XLSX.utils.aoa_to_sheet(dados);
@@ -645,7 +708,7 @@ function exportarPDF() {
   Array.from(tbody.rows).forEach(tr => {
     if (tr.dataset.filtrado === "1") return;
     const cols = Array.from(tr.cells).slice(0, inv ? -1 : undefined);
-    corpo.push(cols.map(td => td.textContent.replace("Crítico", "").replace(/➔/g, "->").trim()));
+    corpo.push(cols.map(td => td.textContent.replace("Crítico", "").replace("🔔 Alerta", "").replace(/➔/g, "->").trim()));
     criticos.push(tr.classList.contains("linha-critica"));
   });
 
