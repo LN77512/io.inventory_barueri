@@ -860,6 +860,152 @@ function exportarPDF() {
   doc.save(`${inv ? "Inventario" : "Historico"}_${agora.toISOString().slice(0, 10)}.pdf`);
 }
 
+/* ---------- Relatório de Críticos ---------- */
+const LIMITE_CRITICO = 5;   // disponível <= 5 = crítico
+const LIMITE_ATENCAO = 10;  // disponível de 6 a 10 = perto de ficar crítico
+
+function classificarNiveis(data) {
+  const grupos = agrupar(data);
+  const vistos = {};
+  const lista = [];
+
+  data.forEach(item => {
+    if (!low(item.nome)) return;
+    const k = chaveDe(item);
+    if (vistos[k]) return;
+    vistos[k] = true;
+
+    const g = grupos[k];
+    if (g.alerta === "nao") return;
+
+    const disp = Math.max(0, g.estoque - g.uso - g.manut);
+    let nivel = null;
+    if (disp === 0) nivel = "zerado";
+    else if (disp <= LIMITE_CRITICO) nivel = "baixo";
+    else if (disp <= LIMITE_ATENCAO) nivel = "atencao";
+    if (!nivel) return;
+
+    lista.push({
+      nome: String(item.nome || "").trim(),
+      marca: String(item.marca || "").trim(),
+      modelo: String(item.modelo || "").trim(),
+      estoque: g.estoque,
+      uso: g.uso,
+      manut: g.manut,
+      disp,
+      nivel
+    });
+  });
+
+  return lista.sort((a, b) =>
+    a.disp - b.disp || `${a.nome} ${a.marca}`.localeCompare(`${b.nome} ${b.marca}`));
+}
+
+function gerarRelatorioCriticos() {
+  if (!window.jspdf || !window.jspdf.jsPDF) {
+    alert("Biblioteca de PDF não carregou. Verifique a internet e recarregue a página.");
+    return;
+  }
+
+  const itens = classificarNiveis(dadosInventarioGlobal);
+  const zerados = itens.filter(i => i.nivel === "zerado");
+  const baixos = itens.filter(i => i.nivel === "baixo");
+  const atencao = itens.filter(i => i.nivel === "atencao");
+
+  if (!itens.length) {
+    alert("Não há itens críticos nem perto de ficar críticos no momento. ✅");
+    return;
+  }
+
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit: "mm", format: "a4" });
+  const W = doc.internal.pageSize.getWidth();
+  const M = 14;
+  const agora = new Date();
+  const geradoEm = `${agora.toLocaleDateString("pt-BR")} ${agora.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}`;
+  let y = 16;
+
+  doc.setFont("helvetica", "bold"); doc.setFontSize(18); doc.setTextColor(0, 43, 92);
+  doc.text("Relatório de Estoque Crítico", M, y);
+  doc.setFont("helvetica", "normal"); doc.setFontSize(9); doc.setTextColor(71, 85, 105);
+  y += 6;
+  doc.text(`THALES Information Systems  |  Gerado em ${geradoEm}  |  Responsável: ${usuarioAtual ? usuarioAtual.nome : "-"}`, M, y);
+  y += 3;
+
+  const titulo = t => {
+    y += 9;
+    if (y > 250) { doc.addPage(); y = 18; }
+    doc.setFont("helvetica", "bold"); doc.setFontSize(12); doc.setTextColor(0, 43, 92);
+    doc.text(t, M, y);
+    y += 2;
+  };
+  const paragrafo = t => {
+    const linhas = doc.splitTextToSize(t, W - 2 * M);
+    y += 5;
+    if (y + linhas.length * 4.5 > 280) { doc.addPage(); y = 18; }
+    doc.setFont("helvetica", "normal"); doc.setFontSize(9.5); doc.setTextColor(30, 41, 59);
+    doc.text(linhas, M, y);
+    y += linhas.length * 4.5;
+  };
+  const tabela = (cabecalho, corpo, corCabecalho, estiloLinha) => {
+    doc.autoTable({
+      startY: y + 2,
+      head: [cabecalho],
+      body: corpo,
+      theme: "grid",
+      margin: { left: M, right: M },
+      styles: { fontSize: 8.5, cellPadding: 1.8, textColor: [30, 41, 59], lineColor: [203, 213, 225] },
+      headStyles: { fillColor: corCabecalho, textColor: 255 },
+      didParseCell: h => {
+        if (h.section === "body" && estiloLinha) {
+          h.cell.styles.fillColor = estiloLinha.f;
+          h.cell.styles.textColor = estiloLinha.t;
+        }
+      }
+    });
+    y = doc.lastAutoTable.finalY;
+  };
+  const linhas = lista => lista.map(i => [
+    i.nome, i.marca, i.modelo, String(i.estoque), String(i.uso), String(i.manut), String(i.disp)
+  ]);
+  const cab = ["Item", "Marca", "Modelo", "Estoque", "Em uso", "Manut.", "Disponível"];
+
+  // 1. Resumo
+  titulo("1. Resumo geral");
+  tabela(["Indicador", "Quantidade"], [
+    ["Itens críticos (disponível <= " + LIMITE_CRITICO + ")", String(zerados.length + baixos.length)],
+    ["   Zerados (0 disponível)", String(zerados.length)],
+    ["   Baixos (1 a " + LIMITE_CRITICO + " disponível)", String(baixos.length)],
+    ["Perto de ficar crítico (" + (LIMITE_CRITICO + 1) + " a " + LIMITE_ATENCAO + " disponível)", String(atencao.length)]
+  ], [30, 41, 59]);
+  paragrafo("Disponível = estoque total - unidades em uso - unidades em manutenção.");
+
+  // 2. Zerados
+  titulo("2. Itens zerados (reposição imediata)");
+  if (zerados.length) tabela(cab, linhas(zerados), [185, 28, 28], { f: [254, 202, 202], t: [127, 29, 29] });
+  else paragrafo("Nenhum item zerado.");
+
+  // 3. Baixos
+  titulo("3. Itens críticos (1 a " + LIMITE_CRITICO + " disponíveis)");
+  if (baixos.length) tabela(cab, linhas(baixos), [234, 88, 12], { f: [255, 237, 213], t: [124, 45, 18] });
+  else paragrafo("Nenhum item nessa faixa.");
+
+  // 4. Atenção
+  titulo("4. Perto de ficar crítico (" + (LIMITE_CRITICO + 1) + " a " + LIMITE_ATENCAO + " disponíveis)");
+  if (atencao.length) tabela(cab, linhas(atencao), [161, 98, 7], { f: [254, 249, 195], t: [113, 63, 18] });
+  else paragrafo("Nenhum item nessa faixa.");
+
+  // Rodapé
+  const n = doc.internal.getNumberOfPages();
+  for (let i = 1; i <= n; i++) {
+    doc.setPage(i);
+    doc.setFont("helvetica", "normal"); doc.setFontSize(8); doc.setTextColor(120);
+    doc.text(`THALES Information Systems  -  Página ${i} de ${n}`, W / 2, 290, { align: "center" });
+  }
+
+  doc.save(`Relatorio_Criticos_${agora.toISOString().slice(0, 10)}.pdf`);
+}
+
 /* ---------- Eventos ---------- */
 document.addEventListener("DOMContentLoaded", async () => {
   el("search-input")?.addEventListener("input", filtrarTabela);
