@@ -100,7 +100,6 @@
           background-color: #001a38;
         }
 
-        /* MODAL DO GRÁFICO E EXCLUSÃO */
         .btn-fechar-modal {
           position: absolute;
           top: 12px;
@@ -160,11 +159,12 @@
           font-size: 0.85em;
         }
 
-        /* NAVEGAÇÃO ENTRE INVENTÁRIO E HISTÓRICO */
+        /* NAVEGAÇÃO ENTRE ABAS */
         .nav-tabs {
           display: flex;
           gap: 10px;
           margin-bottom: 20px;
+          flex-wrap: wrap;
         }
 
         .tab-btn {
@@ -180,6 +180,110 @@
         .tab-btn.active {
           background-color: #002b5c;
           color: white;
+        }
+
+        /* DASHBOARD EXCLUSIVO DE CRÍTICOS */
+        .criticos-kpis {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+          gap: 15px;
+          margin-bottom: 20px;
+        }
+
+        .kpi-card {
+          background-color: #f8f9fa;
+          border: 1px solid #e0e0e0;
+          border-left: 5px solid #002b5c;
+          border-radius: 6px;
+          padding: 14px 16px;
+        }
+
+        .kpi-card.kpi-zerado {
+          border-left-color: #dc3545;
+          background-color: #fff5f5;
+        }
+
+        .kpi-card.kpi-baixo {
+          border-left-color: #fd7e14;
+          background-color: #fff9f2;
+        }
+
+        .kpi-label {
+          font-size: 0.82em;
+          color: #666;
+          font-weight: bold;
+          text-transform: uppercase;
+        }
+
+        .kpi-valor {
+          font-size: 1.7em;
+          font-weight: bold;
+          color: #002b5c;
+          margin-top: 4px;
+        }
+
+        .kpi-card.kpi-zerado .kpi-valor {
+          color: #dc3545;
+        }
+
+        .kpi-card.kpi-baixo .kpi-valor {
+          color: #fd7e14;
+        }
+
+        .criticos-grid {
+          display: grid;
+          grid-template-columns: 1.6fr 1fr;
+          gap: 20px;
+          margin-bottom: 20px;
+        }
+
+        @media (max-width: 900px) {
+          .criticos-grid {
+            grid-template-columns: 1fr;
+          }
+        }
+
+        .painel-card {
+          background-color: #f8f9fa;
+          border: 1px solid #e0e0e0;
+          border-radius: 6px;
+          padding: 16px;
+        }
+
+        .painel-card h3 {
+          margin: 0 0 12px 0;
+          font-size: 1em;
+          color: #002b5c;
+        }
+
+        .critico-item-row {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          gap: 12px;
+          padding: 10px 12px;
+          border-bottom: 1px solid #e9ecef;
+          background-color: #ffffff;
+        }
+
+        .critico-item-row:last-child {
+          border-bottom: none;
+        }
+
+        .btn-repor {
+          background-color: #002b5c;
+          color: #ffffff;
+          border: none;
+          padding: 5px 10px;
+          border-radius: 4px;
+          font-size: 0.8em;
+          font-weight: bold;
+          cursor: pointer;
+          white-space: nowrap;
+        }
+
+        .btn-repor:hover {
+          background-color: #001a38;
         }
 
         /* ALERTAS DE ESTOQUE MÍNIMO */
@@ -293,17 +397,6 @@
 
         .btn-pdf {
           background-color: #dc3545;
-          color: white;
-          border: none;
-          padding: 10px 14px;
-          border-radius: 5px;
-          font-weight: bold;
-          font-size: 0.88em;
-          cursor: pointer;
-        }
-
-        .btn-grafico {
-          background-color: #002b5c;
           color: white;
           border: none;
           padding: 10px 14px;
@@ -469,45 +562,6 @@
         </div>
     </div>
 
-    <!-- MODAL DO GRÁFICO DE STATUS -->
-    <div id="chart-modal" class="login-overlay" style="display: none;">
-        <div class="login-card" style="max-width: 450px;">
-            <button type="button" class="btn-fechar-modal" onclick="fecharModalGrafico()">&times;</button>
-            <h3 style="color: #002b5c; margin-top: 0;">Resumo do Inventário</h3>
-            <div style="max-width: 320px; margin: 0 auto;">
-                <canvas id="statusChart"></canvas>
-            </div>
-        </div>
-    </div>
-
-    <!-- MODAL DO GRÁFICO DE ITENS CRÍTICOS (NOME + MARCA + MODELO) -->
-    <div id="criticos-modal" class="login-overlay" style="display: none;">
-        <div class="login-card" style="max-width: 780px; text-align: left;">
-            <button type="button" class="btn-fechar-modal" onclick="fecharModalCriticos()">&times;</button>
-            <h3 style="color: #002b5c; margin-top: 0; text-align: center;">Itens em Estoque Crítico (Nome / Marca / Modelo)</h3>
-
-            <div style="margin-bottom: 12px;">
-                <input type="text" id="criticos-busca" placeholder="🔍 Filtrar por nome, marca ou modelo..."
-                    autocomplete="off"
-                    style="width: 100%; padding: 8px 12px; border: 1px solid #ccc; border-radius: 5px; box-sizing: border-box;">
-            </div>
-
-            <p id="criticos-vazio" class="login-subtitle" style="display:none; text-align:center;">
-                Nenhum item crítico no momento. ✅
-            </p>
-
-            <div id="criticos-conteudo" style="max-height: 70vh; overflow-y: auto; padding-right: 6px;">
-                <div id="criticos-wrap" style="position: relative; width: 100%; min-height: 240px; margin-bottom: 16px;">
-                    <canvas id="criticosChart"></canvas>
-                </div>
-
-                <div id="criticos-lista" style="border-top: 1px solid #e0e0e0; padding-top: 10px; font-size: 0.88em;">
-                    <!-- Lista compacta dos itens críticos preenchida via JS -->
-                </div>
-            </div>
-        </div>
-    </div>
-
     <!-- MODAL DE CONFIRMAÇÃO DE EXCLUSÃO -->
     <div id="delete-modal" class="login-overlay" style="display: none;">
         <div class="login-card">
@@ -539,6 +593,7 @@
         <!-- Navegação por Abas -->
         <div class="nav-tabs">
             <button id="tab-inv-btn" class="tab-btn active" onclick="mudarAba('inventario')">📦 Inventário</button>
+            <button id="tab-crit-btn" class="tab-btn" onclick="mudarAba('criticos')">🚨 Críticos</button>
             <button id="tab-hist-btn" class="tab-btn" onclick="mudarAba('historico')">📜 Histórico de Movimentações</button>
         </div>
 
@@ -574,8 +629,6 @@
             <div class="toolbar-container">
                 <input type="text" id="search-input" placeholder="🔍 Pesquisar em qualquer coluna..." autocomplete="off">
                 <div class="export-buttons">
-                    <button type="button" onclick="abrirModalGrafico()" class="btn-grafico">📈 Ver Gráfico</button>
-                    <button type="button" onclick="abrirModalCriticos()" class="btn-grafico" style="background-color:#dc3545;">🚨 Itens Críticos</button>
                     <button type="button" onclick="exportarExcel()" class="btn-excel">📊 Exportar Excel (.xlsx)</button>
                     <button type="button" onclick="exportarPDF()" class="btn-pdf">📄 Exportar PDF</button>
                 </div>
@@ -605,7 +658,57 @@
             </div>
         </div>
 
-        <!-- VISÃO 2: HISTÓRICO DE MOVIMENTAÇÕES -->
+        <!-- VISÃO 2: DASHBOARD EXCLUSIVO DE ITENS CRÍTICOS -->
+        <div id="visao-criticos" style="display: none;">
+            <div class="criticos-kpis">
+                <div class="kpi-card">
+                    <div class="kpi-label">Itens Críticos (≤ 5 disp.)</div>
+                    <div class="kpi-valor" id="kpi-criticos-total">0</div>
+                </div>
+                <div class="kpi-card kpi-zerado">
+                    <div class="kpi-label">Zerados (0 disponível)</div>
+                    <div class="kpi-valor" id="kpi-criticos-zerados">0</div>
+                </div>
+                <div class="kpi-card kpi-baixo">
+                    <div class="kpi-label">Baixos (1 a 5 disponível)</div>
+                    <div class="kpi-valor" id="kpi-criticos-baixos">0</div>
+                </div>
+            </div>
+
+            <div class="toolbar-container">
+                <input type="text" id="criticos-busca" placeholder="🔍 Filtrar críticos por nome, marca ou modelo..." autocomplete="off">
+            </div>
+
+            <p id="criticos-vazio" class="login-subtitle" style="display:none; text-align:center; margin: 20px 0;">
+                Nenhum item crítico no momento. ✅
+            </p>
+
+            <div id="criticos-conteudo">
+                <div class="criticos-grid">
+                    <div class="painel-card">
+                        <h3>Quantidade Disponível por Item Crítico (Nome / Marca / Modelo)</h3>
+                        <div id="criticos-wrap" style="position: relative; width: 100%; min-height: 240px;">
+                            <canvas id="criticosChart"></canvas>
+                        </div>
+                    </div>
+                    <div class="painel-card">
+                        <h3>Proporção de Urgência (Zerados vs. Baixos)</h3>
+                        <div style="max-width: 280px; margin: 0 auto; position: relative; height: 240px;">
+                            <canvas id="criticosProporcaoChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="painel-card" style="padding: 0; overflow: hidden;">
+                    <div style="padding: 12px 16px; background-color: #343a40; color: #fff; font-weight: bold; font-size: 0.9em;">
+                        Detalhamento dos Itens Críticos
+                    </div>
+                    <div id="criticos-lista"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- VISÃO 3: HISTÓRICO DE MOVIMENTAÇÕES -->
         <div id="visao-historico" style="display: none;">
             <div class="toolbar-container" style="flex-wrap: wrap;">
                 <input type="text" id="search-history-input" placeholder="🔍 Pesquisar no histórico..." autocomplete="off">
@@ -641,6 +744,6 @@
         </div>
     </div>
 
-    <script src="script.js?v=21.0"></script>
+    <script src="script.js?v=21.1"></script>
 </body>
 </html>
