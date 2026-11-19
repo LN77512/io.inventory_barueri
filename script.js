@@ -177,6 +177,8 @@ function logout() {
   el("app-container").style.display = "none";
   esconder("security-code-modal");
   esconder("first-access-modal");
+  esconder("chart-modal");
+  esconder("criticos-modal");
   mostrar("login-modal");
   ["usr-field", "pwd-field", "sec-code-field", "new-usr-field", "new-pwd-field"].forEach(id => { el(id).value = ""; });
 }
@@ -198,6 +200,86 @@ function abrirModalGrafico() {
 
 function fecharModalGrafico() {
   esconder("chart-modal");
+}
+
+/* ---------- Gráfico de itens críticos ---------- */
+let meuGraficoCriticos = null;
+
+// Lista grupos (nome+marca+modelo) com disponível <= 5 e alerta não dispensado
+function listarCriticos(data) {
+  const grupos = agrupar(data);
+  const vistos = {};
+  const lista = [];
+  data.forEach(item => {
+    if (!low(item.nome)) return;
+    const k = chaveDe(item);
+    if (vistos[k]) return;
+    vistos[k] = true;
+    const g = grupos[k];
+    const disp = g.estoque - g.uso - g.manut;
+    if (disp <= 5 && g.alerta !== "nao") {
+      lista.push({
+        rotulo: `${item.nome} ${item.marca} - ${item.modelo}`,
+        disp: Math.max(0, disp),
+        estoque: g.estoque
+      });
+    }
+  });
+  return lista.sort((a, b) => a.disp - b.disp);
+}
+
+function abrirModalCriticos() {
+  mostrar("criticos-modal");
+  atualizarGraficoCriticos(dadosInventarioGlobal);
+}
+
+function fecharModalCriticos() {
+  esconder("criticos-modal");
+}
+
+function atualizarGraficoCriticos(data) {
+  const canvas = el("criticosChart");
+  if (!canvas) return;
+  const lista = listarCriticos(data);
+
+  if (meuGraficoCriticos) meuGraficoCriticos.destroy();
+  el("criticos-vazio").style.display = lista.length ? "none" : "block";
+  el("criticos-wrap").style.display = lista.length ? "block" : "none";
+  if (!lista.length) return;
+
+  // Altura proporcional à quantidade de itens
+  el("criticos-wrap").style.height = Math.max(220, lista.length * 55 + 90) + "px";
+
+  meuGraficoCriticos = new Chart(canvas, {
+    type: "bar",
+    data: {
+      labels: lista.map(i => i.rotulo),
+      datasets: [
+        {
+          label: "Disponível",
+          data: lista.map(i => i.disp),
+          backgroundColor: lista.map(i => (i.disp === 0 ? "#dc3545" : "#fd7e14"))
+        },
+        {
+          label: "Estoque Total",
+          data: lista.map(i => i.estoque),
+          backgroundColor: "#ced4da"
+        }
+      ]
+    },
+    options: {
+      indexAxis: "y",
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { position: "bottom" },
+        title: { display: true, text: `${lista.length} item(ns) em estoque crítico (disponível ≤ 5)` }
+      },
+      scales: {
+        x: { beginAtZero: true, ticks: { precision: 0 } }
+      }
+    }
+  });
 }
 
 // Agrupa por nome+marca+modelo: estoque total, em uso e em manutenção
@@ -318,6 +400,7 @@ function processarEExibirDados(data) {
 
   filtrarTabela();
   if (el("chart-modal").style.display === "flex") atualizarDashboard(dadosInventarioGlobal);
+  if (el("criticos-modal").style.display === "flex") atualizarGraficoCriticos(dadosInventarioGlobal);
 }
 
 async function carregarItens() {
