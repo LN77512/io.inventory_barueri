@@ -3,8 +3,8 @@ const GAS_URL = "https://script.google.com/macros/s/AKfycbx6ubLw4yvvBwA-CoOv2UGr
 let token = null;
 let usuarioAtual = null;
 let itemEmEdicao = null;
-let meuGraficoStatus = null;
 let meuGraficoCriticos = null;
+let meuGraficoCriticosProporcao = null;
 let dadosInventarioGlobal = [];
 let itemParaDeletarTemp = null;
 
@@ -178,32 +178,26 @@ function logout() {
   el("app-container").style.display = "none";
   esconder("security-code-modal");
   esconder("first-access-modal");
-  esconder("chart-modal");
-  esconder("criticos-modal");
+  mudarAba("inventario");
   mostrar("login-modal");
   ["usr-field", "pwd-field", "sec-code-field", "new-usr-field", "new-pwd-field"].forEach(id => { el(id).value = ""; });
 }
 
-/* ---------- Abas e gráficos ---------- */
+/* ---------- Abas ---------- */
 function mudarAba(aba) {
-  const inv = aba === "inventario";
-  el("visao-inventario").style.display = inv ? "block" : "none";
-  el("visao-historico").style.display = inv ? "none" : "block";
-  el("tab-inv-btn").classList.toggle("active", inv);
-  el("tab-hist-btn").classList.toggle("active", !inv);
-  if (!inv) carregarHistorico();
+  el("visao-inventario").style.display = aba === "inventario" ? "block" : "none";
+  el("visao-criticos").style.display = aba === "criticos" ? "block" : "none";
+  el("visao-historico").style.display = aba === "historico" ? "block" : "none";
+
+  el("tab-inv-btn").classList.toggle("active", aba === "inventario");
+  el("tab-crit-btn").classList.toggle("active", aba === "criticos");
+  el("tab-hist-btn").classList.toggle("active", aba === "historico");
+
+  if (aba === "criticos") atualizarDashboardCriticos(dadosInventarioGlobal);
+  else if (aba === "historico") carregarHistorico();
 }
 
-function abrirModalGrafico() {
-  mostrar("chart-modal");
-  atualizarDashboard(dadosInventarioGlobal);
-}
-
-function fecharModalGrafico() {
-  esconder("chart-modal");
-}
-
-/* ---------- Gráfico de itens críticos (Nome + Marca + Modelo) ---------- */
+/* ---------- Dashboard Exclusivo de Itens Críticos ---------- */
 function listarCriticosDetalhado(data) {
   const grupos = agrupar(data);
   const vistos = {};
@@ -225,6 +219,7 @@ function listarCriticosDetalhado(data) {
       const rotulo = `${nomeLimpo}${marcaLimpa ? " " + marcaLimpa : ""}${modeloLimpo ? " - " + modeloLimpo : ""}`;
 
       lista.push({
+        id: item.id,
         chave: k,
         nome: nomeLimpo,
         marca: marcaLimpa,
@@ -240,21 +235,11 @@ function listarCriticosDetalhado(data) {
   return lista.sort((a, b) => a.disp - b.disp || a.rotulo.localeCompare(b.rotulo));
 }
 
-function abrirModalCriticos() {
-  const busca = el("criticos-busca");
-  if (busca) busca.value = "";
-  mostrar("criticos-modal");
-  atualizarGraficoCriticos(dadosInventarioGlobal, "");
-}
-
-function fecharModalCriticos() {
-  esconder("criticos-modal");
-}
-
-function atualizarGraficoCriticos(data, filtro = el("criticos-busca")?.value || "") {
+function atualizarDashboardCriticos(data, filtro = el("criticos-busca")?.value || "") {
   const canvas = el("criticosChart");
+  const canvasProp = el("criticosProporcaoChart");
   const wrap = el("criticos-wrap");
-  if (!canvas || !wrap) return;
+  if (!canvas || !canvasProp || !wrap) return;
 
   const termo = norm(filtro);
   const todos = listarCriticosDetalhado(data);
@@ -262,14 +247,21 @@ function atualizarGraficoCriticos(data, filtro = el("criticos-busca")?.value || 
     ? todos.filter(i => norm(`${i.nome} ${i.marca} ${i.modelo} ${i.rotulo}`).includes(termo))
     : todos;
 
+  const zeradosCount = filtrados.filter(i => i.zerado).length;
+  const baixosCount = filtrados.length - zeradosCount;
+
+  el("kpi-criticos-total").textContent = filtrados.length;
+  el("kpi-criticos-zerados").textContent = zeradosCount;
+  el("kpi-criticos-baixos").textContent = baixosCount;
+
   if (meuGraficoCriticos) meuGraficoCriticos.destroy();
+  if (meuGraficoCriticosProporcao) meuGraficoCriticosProporcao.destroy();
 
   el("criticos-vazio").style.display = filtrados.length ? "none" : "block";
   el("criticos-conteudo").style.display = filtrados.length ? "block" : "none";
   if (!filtrados.length) return;
 
-  wrap.style.height = Math.max(240, filtrados.length * 38 + 80) + "px";
-
+  wrap.style.height = Math.max(240, filtrados.length * 36 + 50) + "px";
   const maxValor = Math.max(5, ...filtrados.map(i => Math.max(i.disp, i.estoque)));
 
   meuGraficoCriticos = new Chart(canvas, {
@@ -291,10 +283,6 @@ function atualizarGraficoCriticos(data, filtro = el("criticos-busca")?.value || 
       maintainAspectRatio: false,
       plugins: {
         legend: { display: false },
-        title: {
-          display: true,
-          text: `${filtrados.length} item(ns) crítico(s) por Nome / Marca / Modelo`
-        },
         tooltip: {
           callbacks: {
             label: ctx => {
@@ -308,21 +296,46 @@ function atualizarGraficoCriticos(data, filtro = el("criticos-busca")?.value || 
         x: {
           beginAtZero: true,
           suggestedMax: maxValor,
-          ticks: { precision: 0 }
+          ticks: { precision: 0 },
+          grid: { display: false }
         },
         y: {
-          ticks: { font: { size: 11 } }
+          ticks: { font: { size: 11 } },
+          grid: { display: false }
         }
       }
     }
   });
 
+  meuGraficoCriticosProporcao = new Chart(canvasProp, {
+    type: "doughnut",
+    data: {
+      labels: [`Zerados (${zeradosCount})`, `Baixos 1-5 (${baixosCount})`],
+      datasets: [
+        {
+          data: [zeradosCount, baixosCount],
+          backgroundColor: ["#dc3545", "#fd7e14"]
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { position: "bottom" }
+      }
+    }
+  });
+
   el("criticos-lista").innerHTML = filtrados.map(item => `
-    <div style="display:flex; justify-content:space-between; align-items:center; padding:6px 4px; border-bottom:1px solid #f0f0f0;">
-      <span>${esc(item.rotulo)}</span>
-      <strong style="color:${item.zerado ? "#dc3545" : "#fd7e14"}; white-space:nowrap; margin-left:10px;">
-        Disp: ${item.disp} / ${item.estoque}
-      </strong>
+    <div class="critico-item-row">
+      <div>
+        <strong>${esc(item.rotulo)}</strong>
+        <span style="margin-left:8px; color:${item.zerado ? "#dc3545" : "#fd7e14"}; font-weight:bold;">
+          (Disp: ${item.disp} / ${item.estoque})
+        </span>
+      </div>
+      <button type="button" class="btn-repor" data-repor-id="${esc(item.id)}">Editar / Repor</button>
     </div>
   `).join("");
 }
@@ -343,32 +356,6 @@ function agrupar(data) {
     else if (!st.includes("disponivel")) x.uso += q;
   });
   return g;
-}
-
-function atualizarDashboard(data) {
-  const ctx = el("statusChart");
-  if (!ctx) return;
-  let disp = 0, uso = 0, man = 0;
-  Object.values(agrupar(data)).forEach(g => {
-    disp += Math.max(0, g.estoque - g.uso - g.manut);
-    uso += g.uso;
-    man += g.manut;
-  });
-  if (meuGraficoStatus) meuGraficoStatus.destroy();
-  meuGraficoStatus = new Chart(ctx, {
-    type: "doughnut",
-    data: {
-      labels: [`Disponível (${disp})`, `Em Uso (${uso})`, `Manutenção (${man})`],
-      datasets: [{ data: [disp, uso, man], backgroundColor: ["#28a745", "#002b5c", "#fd7e14"] }]
-    },
-    options: {
-      responsive: true,
-      plugins: {
-        legend: { position: "bottom" },
-        title: { display: true, text: `Proporção por Quantidade (Total: ${disp + uso + man} peças)` }
-      }
-    }
-  });
 }
 
 /* ---------- Inventário ---------- */
@@ -441,8 +428,7 @@ function processarEExibirDados(data) {
   }
 
   filtrarTabela();
-  if (el("chart-modal").style.display === "flex") atualizarDashboard(dadosInventarioGlobal);
-  if (el("criticos-modal").style.display === "flex") atualizarGraficoCriticos(dadosInventarioGlobal);
+  if (el("visao-criticos").style.display === "block") atualizarDashboardCriticos(dadosInventarioGlobal);
 }
 
 async function carregarItens() {
@@ -458,6 +444,7 @@ async function carregarItens() {
 function prepararEdicao(id) {
   const item = dadosInventarioGlobal.find(i => String(i.id) === String(id));
   if (!item) return;
+  mudarAba("inventario");
   const g = agrupar(dadosInventarioGlobal)[chaveDe(item)];
   itemEmEdicao = {
     nome: String(item.nome ?? "").trim(),
@@ -878,7 +865,13 @@ document.addEventListener("DOMContentLoaded", async () => {
   el("search-input")?.addEventListener("input", filtrarTabela);
   el("search-history-input")?.addEventListener("input", filtrarHistorico);
   el("criticos-busca")?.addEventListener("input", e => {
-    atualizarGraficoCriticos(dadosInventarioGlobal, e.target.value);
+    atualizarDashboardCriticos(dadosInventarioGlobal, e.target.value);
+  });
+
+  el("criticos-lista")?.addEventListener("click", e => {
+    const btn = e.target.closest("button[data-repor-id]");
+    if (!btn) return;
+    prepararEdicao(btn.dataset.reporId);
   });
 
   el("inventory-body")?.addEventListener("click", e => {
