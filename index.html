@@ -480,14 +480,30 @@
         </div>
     </div>
 
-    <!-- MODAL DO GRÁFICO DE ITENS CRÍTICOS -->
+    <!-- MODAL DO GRÁFICO DE ITENS CRÍTICOS POR MARCA -->
     <div id="criticos-modal" class="login-overlay" style="display: none;">
-        <div class="login-card" style="max-width: 700px;">
+        <div class="login-card" style="max-width: 740px; text-align: left;">
             <button type="button" class="btn-fechar-modal" onclick="fecharModalCriticos()">&times;</button>
-            <h3 style="color: #002b5c; margin-top: 0;">Itens em Estoque Crítico</h3>
-            <p id="criticos-vazio" class="login-subtitle" style="display:none;">Nenhum item crítico no momento. ✅</p>
-            <div id="criticos-wrap" style="position: relative; width: 100%; height: 300px;">
-                <canvas id="criticosChart"></canvas>
+            <h3 style="color: #002b5c; margin-top: 0; text-align: center;">Itens em Estoque Crítico por Marca</h3>
+
+            <div style="margin-bottom: 12px;">
+                <input type="text" id="criticos-busca" placeholder="🔍 Filtrar por marca, nome ou modelo..."
+                    autocomplete="off"
+                    style="width: 100%; padding: 8px 12px; border: 1px solid #ccc; border-radius: 5px; box-sizing: border-box;">
+            </div>
+
+            <p id="criticos-vazio" class="login-subtitle" style="display:none; text-align:center;">
+                Nenhum item crítico no momento. ✅
+            </p>
+
+            <div id="criticos-conteudo" style="max-height: 65vh; overflow-y: auto; padding-right: 4px;">
+                <div id="criticos-wrap" style="position: relative; width: 100%; height: 260px; margin-bottom: 16px;">
+                    <canvas id="criticosChart"></canvas>
+                </div>
+
+                <div id="criticos-lista" style="border-top: 1px solid #e0e0e0; padding-top: 10px; font-size: 0.88em;">
+                    <!-- Lista compacta dos itens críticos preenchida via JS -->
+                </div>
             </div>
         </div>
     </div>
@@ -625,6 +641,6 @@
         </div>
     </div>
 
-    <script src="script.js?v=17.0"></script>
+    <script src="script.js?v=18.0"></script>
 </body>
 </html>
