@@ -219,8 +219,10 @@ function listarCriticosDetalhado(data) {
     const disp = g.estoque - g.uso - g.manut;
     if (disp <= 5 && g.alerta !== "nao") {
       const dispSeguro = Math.max(0, disp);
+      const marcaLimpa = String(item.marca || "Sem Marca").trim();
       lista.push({
-        marca: String(item.marca || "Sem Marca").trim(),
+        marcaKey: norm(marcaLimpa) || "sem marca",
+        marca: marcaLimpa,
         rotulo: `${item.nome} ${item.marca} - ${item.modelo}`,
         disp: dispSeguro,
         estoque: g.estoque,
@@ -261,31 +263,40 @@ function atualizarGraficoCriticos(data, filtro = el("criticos-busca")?.value || 
 
   const porMarca = {};
   filtrados.forEach(item => {
-    const m = item.marca || "Sem Marca";
-    if (!porMarca[m]) porMarca[m] = { zerados: 0, baixos: 0 };
-    if (item.zerado) porMarca[m].zerados += 1;
-    else porMarca[m].baixos += 1;
+    const chaveMarca = item.marcaKey || "sem marca";
+    if (!porMarca[chaveMarca]) {
+      porMarca[chaveMarca] = {
+        label: item.marca || "Sem Marca",
+        qtdZerados: 0,
+        qtdBaixos: 0
+      };
+    }
+    if (item.zerado) {
+      porMarca[chaveMarca].qtdZerados += item.disp;
+    } else {
+      porMarca[chaveMarca].qtdBaixos += item.disp;
+    }
   });
 
-  const marcas = Object.keys(porMarca).sort((a, b) => {
-    const totA = porMarca[a].zerados + porMarca[a].baixos;
-    const totB = porMarca[b].zerados + porMarca[b].baixos;
-    return totB - totA || a.localeCompare(b);
+  const marcasOrdenadas = Object.values(porMarca).sort((a, b) => {
+    const totA = a.qtdZerados + a.qtdBaixos;
+    const totB = b.qtdZerados + b.qtdBaixos;
+    return totB - totA || a.label.localeCompare(b.label);
   });
 
   meuGraficoCriticos = new Chart(canvas, {
     type: "bar",
     data: {
-      labels: marcas,
+      labels: marcasOrdenadas.map(m => m.label),
       datasets: [
         {
           label: "Zerados (0 disp.)",
-          data: marcas.map(m => porMarca[m].zerados),
+          data: marcasOrdenadas.map(m => m.qtdZerados),
           backgroundColor: "#dc3545"
         },
         {
-          label: "Baixos (1 a 5 disp.)",
-          data: marcas.map(m => porMarca[m].baixos),
+          label: "Qtd. Disponível em Baixos (1 a 5)",
+          data: marcasOrdenadas.map(m => m.qtdBaixos),
           backgroundColor: "#fd7e14"
         }
       ]
@@ -297,7 +308,7 @@ function atualizarGraficoCriticos(data, filtro = el("criticos-busca")?.value || 
         legend: { position: "bottom" },
         title: {
           display: true,
-          text: `${filtrados.length} item(ns) crítico(s) em ${marcas.length} marca(s)`
+          text: `${filtrados.length} item(ns) crítico(s) em ${marcasOrdenadas.length} marca(s)`
         }
       },
       scales: {
@@ -882,7 +893,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (e.key === "Enter") tentarLoginDireto();
   });
 
-  // Restaura sessão salva no sessionStorage, se existir
   try {
     const salva = sessionStorage.getItem("thales_sessao");
     if (salva) {
