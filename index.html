@@ -629,6 +629,7 @@
             <div class="toolbar-container">
                 <input type="text" id="search-input" placeholder="🔍 Pesquisar em qualquer coluna..." autocomplete="off">
                 <div class="export-buttons">
+                    <button type="button" onclick="gerarRelatorioCriticos()" class="btn-pdf">📄 Relatório de Críticos</button>
                     <button type="button" onclick="exportarExcel()" class="btn-excel">📊 Exportar Excel (.xlsx)</button>
                     <button type="button" onclick="exportarPDF()" class="btn-pdf">📄 Exportar PDF</button>
                 </div>
@@ -677,6 +678,9 @@
 
             <div class="toolbar-container">
                 <input type="text" id="criticos-busca" placeholder="🔍 Filtrar críticos por nome, marca ou modelo..." autocomplete="off">
+                <div class="export-buttons">
+                    <button type="button" onclick="gerarRelatorioCriticos()" class="btn-pdf">📄 Gerar Relatório de Críticos</button>
+                </div>
             </div>
 
             <p id="criticos-vazio" class="login-subtitle" style="display:none; text-align:center; margin: 20px 0;">
@@ -744,6 +748,6 @@
         </div>
     </div>
 
-    <script src="script.js?v=21.1"></script>
+    <script src="script.js?v=21.2"></script>
 </body>
 </html>
