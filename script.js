@@ -4,6 +4,7 @@ let token = null;
 let usuarioAtual = null;
 let itemEmEdicao = null;
 let meuGraficoStatus = null;
+let meuGraficoCriticos = null;
 let dadosInventarioGlobal = [];
 let itemParaDeletarTemp = null;
 
@@ -183,7 +184,7 @@ function logout() {
   ["usr-field", "pwd-field", "sec-code-field", "new-usr-field", "new-pwd-field"].forEach(id => { el(id).value = ""; });
 }
 
-/* ---------- Abas e gráfico ---------- */
+/* ---------- Abas e gráficos ---------- */
 function mudarAba(aba) {
   const inv = aba === "inventario";
   el("visao-inventario").style.display = inv ? "block" : "none";
@@ -202,84 +203,118 @@ function fecharModalGrafico() {
   esconder("chart-modal");
 }
 
-/* ---------- Gráfico de itens críticos ---------- */
-let meuGraficoCriticos = null;
-
-// Lista grupos (nome+marca+modelo) com disponível <= 5 e alerta não dispensado
-function listarCriticos(data) {
+/* ---------- Gráfico de itens críticos por marca ---------- */
+function listarCriticosDetalhado(data) {
   const grupos = agrupar(data);
   const vistos = {};
   const lista = [];
+
   data.forEach(item => {
     if (!low(item.nome)) return;
     const k = chaveDe(item);
     if (vistos[k]) return;
     vistos[k] = true;
+
     const g = grupos[k];
     const disp = g.estoque - g.uso - g.manut;
     if (disp <= 5 && g.alerta !== "nao") {
+      const dispSeguro = Math.max(0, disp);
       lista.push({
+        marca: String(item.marca || "Sem Marca").trim(),
         rotulo: `${item.nome} ${item.marca} - ${item.modelo}`,
-        disp: Math.max(0, disp),
-        estoque: g.estoque
+        disp: dispSeguro,
+        estoque: g.estoque,
+        zerado: dispSeguro === 0
       });
     }
   });
-  return lista.sort((a, b) => a.disp - b.disp);
+
+  return lista.sort((a, b) => a.disp - b.disp || a.rotulo.localeCompare(b.rotulo));
 }
 
 function abrirModalCriticos() {
+  const busca = el("criticos-busca");
+  if (busca) busca.value = "";
   mostrar("criticos-modal");
-  atualizarGraficoCriticos(dadosInventarioGlobal);
+  atualizarGraficoCriticos(dadosInventarioGlobal, "");
 }
 
 function fecharModalCriticos() {
   esconder("criticos-modal");
 }
 
-function atualizarGraficoCriticos(data) {
+function atualizarGraficoCriticos(data, filtro = el("criticos-busca")?.value || "") {
   const canvas = el("criticosChart");
   if (!canvas) return;
-  const lista = listarCriticos(data);
+
+  const termo = norm(filtro);
+  const todos = listarCriticosDetalhado(data);
+  const filtrados = termo
+    ? todos.filter(i => norm(`${i.rotulo} ${i.marca}`).includes(termo))
+    : todos;
 
   if (meuGraficoCriticos) meuGraficoCriticos.destroy();
-  el("criticos-vazio").style.display = lista.length ? "none" : "block";
-  el("criticos-wrap").style.display = lista.length ? "block" : "none";
-  if (!lista.length) return;
 
-  // Altura proporcional à quantidade de itens
-  el("criticos-wrap").style.height = Math.max(220, lista.length * 55 + 90) + "px";
+  el("criticos-vazio").style.display = filtrados.length ? "none" : "block";
+  el("criticos-conteudo").style.display = filtrados.length ? "block" : "none";
+  if (!filtrados.length) return;
+
+  const porMarca = {};
+  filtrados.forEach(item => {
+    const m = item.marca || "Sem Marca";
+    if (!porMarca[m]) porMarca[m] = { zerados: 0, baixos: 0 };
+    if (item.zerado) porMarca[m].zerados += 1;
+    else porMarca[m].baixos += 1;
+  });
+
+  const marcas = Object.keys(porMarca).sort((a, b) => {
+    const totA = porMarca[a].zerados + porMarca[a].baixos;
+    const totB = porMarca[b].zerados + porMarca[b].baixos;
+    return totB - totA || a.localeCompare(b);
+  });
 
   meuGraficoCriticos = new Chart(canvas, {
     type: "bar",
     data: {
-      labels: lista.map(i => i.rotulo),
+      labels: marcas,
       datasets: [
         {
-          label: "Disponível",
-          data: lista.map(i => i.disp),
-          backgroundColor: lista.map(i => (i.disp === 0 ? "#dc3545" : "#fd7e14"))
+          label: "Zerados (0 disp.)",
+          data: marcas.map(m => porMarca[m].zerados),
+          backgroundColor: "#dc3545"
         },
         {
-          label: "Estoque Total",
-          data: lista.map(i => i.estoque),
-          backgroundColor: "#ced4da"
+          label: "Baixos (1 a 5 disp.)",
+          data: marcas.map(m => porMarca[m].baixos),
+          backgroundColor: "#fd7e14"
         }
       ]
     },
     options: {
-      indexAxis: "y",
       responsive: true,
       maintainAspectRatio: false,
       plugins: {
         legend: { position: "bottom" },
-        title: { display: true, text: `${lista.length} item(ns) em estoque crítico (disponível ≤ 5)` }
+        title: {
+          display: true,
+          text: `${filtrados.length} item(ns) crítico(s) em ${marcas.length} marca(s)`
+        }
       },
       scales: {
-        x: { beginAtZero: true, ticks: { precision: 0 } }
+        x: { stacked: false },
+        y: { beginAtZero: true, stacked: false, ticks: { precision: 0 } }
       }
     }
   });
+
+  el("criticos-lista").innerHTML = filtrados.map(item => `
+    <div style="display:flex; justify-content:space-between; align-items:center; padding:6px 4px; border-bottom:1px solid #f0f0f0;">
+      <span>${esc(item.rotulo)}</span>
+      <strong style="color:${item.zerado ? "#dc3545" : "#fd7e14"}; white-space:nowrap; margin-left:10px;">
+        Disp: ${item.disp} / ${item.estoque}
+      </strong>
+    </div>
+  `).join("");
 }
 
 // Agrupa por nome+marca+modelo: estoque total, em uso e em manutenção
@@ -339,7 +374,6 @@ function processarEExibirDados(data) {
   const grupos = agrupar(data);
   let temCritico = false;
 
-  // Soma das quantidades de todas as linhas do mesmo nome+marca+modelo
   const somas = {};
   data.forEach(item => {
     if (!low(item.nome)) return;
@@ -354,7 +388,6 @@ function processarEExibirDados(data) {
     const critico = g.estoque - g.uso - g.manut <= 5 && g.alerta !== "nao";
     if (critico) temCritico = true;
 
-    // Soma do grupo maior que o estoque total
     const soma = somas[chaveDe(item)];
     const excedido = soma > g.estoque;
     if (excedido) {
@@ -388,7 +421,6 @@ function processarEExibirDados(data) {
     if (temCritico) alerta.innerHTML = "⚠️ <strong>Atenção! Existem produtos com o estoque disponível no limite crítico.</strong>";
   }
 
-  // Aviso de quantidade maior que o estoque
   const alertaExcesso = el("alerta-excesso");
   if (alertaExcesso) {
     const lista = Object.values(avisosExcesso);
@@ -444,7 +476,6 @@ async function salvarItem(event) {
     quantidade_estoque: v("quantidade_estoque"), status: v("status"), responsavel: v("responsavel")
   };
 
-  // Bloqueia se (em uso + manutenção) passar do estoque total do grupo
   const chaveGrupo = chaveDe(campos);
   const simulado = dadosInventarioGlobal
     .filter(i => String(i.id) !== String(idExistente))
@@ -469,7 +500,6 @@ async function salvarItem(event) {
   };
   resetarFormulario();
 
-  // Atualiza a tela na hora (otimista) e propaga o estoque para o grupo todo
   if (idExistente) {
     const idx = dadosInventarioGlobal.findIndex(i => String(i.id) === String(idExistente));
     if (idx !== -1) Object.assign(dadosInventarioGlobal[idx], registro);
@@ -481,7 +511,6 @@ async function salvarItem(event) {
   });
   processarEExibirDados(dadosInventarioGlobal);
 
-  // Decide já se precisa perguntar e abre o modal na hora (sem esperar o servidor)
   const disponivel = gSim.estoque - gSim.uso - gSim.manut;
   const gAtual = agrupar(dadosInventarioGlobal)[chaveGrupo];
   const decisao = gAtual ? gAtual.alerta : "";
@@ -503,14 +532,12 @@ async function salvarItem(event) {
       registrarHistorico("ADICIONOU", campos.nome, campos.modelo, `Qtd Inicial: ${campos.quantidade}, Estoque: ${campos.quantidade_estoque}, Status: ${campos.status}`);
     }
 
-    // Aviso de estoque crítico (disponível <= 5): pergunta Sim/Não uma vez por grupo
     if (precisaPerguntar) {
       const sim = await perguntaPromise;
       await definirAlertaGrupo(chaveGrupo, sim ? "sim" : "nao");
       registrarHistorico("ALERTA", campos.nome, campos.modelo,
         sim ? "Alerta de estoque crítico ativado" : "Alerta de estoque crítico dispensado");
     } else if (disponivel > 5 && decisao) {
-      // Estoque voltou ao normal: limpa a decisão para perguntar de novo numa próxima queda
       await definirAlertaGrupo(chaveGrupo, "");
     }
   } catch (err) {
@@ -521,7 +548,6 @@ async function salvarItem(event) {
   carregarItens();
 }
 
-// Modal de alerta (mesmo visual do modal de confirmação) com botões Sim e Não
 function perguntarAlerta(c, disponivel) {
   return new Promise(resolve => {
     let m = el("alert-modal");
@@ -551,11 +577,10 @@ function perguntarAlerta(c, disponivel) {
   });
 }
 
-// Grava "sim", "nao" ou "" na coluna alerta de todas as linhas do mesmo nome+marca+modelo
 async function definirAlertaGrupo(chave, valor) {
   const linhas = dadosInventarioGlobal.filter(i => chaveDe(i) === chave);
   linhas.forEach(i => { i.alerta = valor; });
-  processarEExibirDados(dadosInventarioGlobal); // mostra a cor na hora
+  processarEExibirDados(dadosInventarioGlobal);
   for (const i of linhas) {
     await api({ action: "UPDATE", sheet: "inventario", id: i.id, data: { alerta: valor } });
   }
@@ -688,7 +713,6 @@ function garantirPaginador(tipo) {
   return div;
 }
 
-// Mostra só as linhas da página atual (entre as que passaram no filtro)
 function paginar(tipo) {
   const p = PAG[tipo];
   const linhas = Array.from(el(p.corpo).rows);
@@ -711,7 +735,6 @@ function paginar(tipo) {
   div.querySelector(".pag-prox").disabled = p.pagina >= paginas;
 }
 
-// Na impressão do navegador, mostra todas as linhas filtradas
 window.addEventListener("beforeprint", () => {
   Object.values(PAG).forEach(p => {
     Array.from(el(p.corpo).rows).forEach(tr => { tr.style.display = tr.dataset.filtrado === "1" ? "none" : ""; });
@@ -725,7 +748,7 @@ function filtrarTabela() {
   if (!input) return;
   const termo = norm(input.value);
   const p = PAG.inv;
-  if (p.sig !== termo) { p.sig = termo; p.pagina = 1; } // filtro mudou: volta para a página 1
+  if (p.sig !== termo) { p.sig = termo; p.pagina = 1; }
   Array.from(el("inventory-body").rows).forEach(tr => {
     tr.dataset.filtrado = norm(tr.textContent).includes(termo) ? "" : "1";
   });
@@ -777,7 +800,6 @@ function exportarExcel() {
 }
 
 function exportarPDF() {
-  // Se a biblioteca de PDF não carregou, usa a impressão do navegador
   if (!window.jspdf) { window.print(); return; }
 
   const inv = el("visao-inventario").style.display !== "none";
@@ -845,33 +867,33 @@ function exportarPDF() {
 document.addEventListener("DOMContentLoaded", async () => {
   el("search-input")?.addEventListener("input", filtrarTabela);
   el("search-history-input")?.addEventListener("input", filtrarHistorico);
+  el("criticos-busca")?.addEventListener("input", e => {
+    atualizarGraficoCriticos(dadosInventarioGlobal, e.target.value);
+  });
 
-  // Botões Editar/Remover (sem onclick inline, sem risco de quebrar com aspas)
-  el("inventory-body").addEventListener("click", e => {
+  el("inventory-body")?.addEventListener("click", e => {
     const btn = e.target.closest("button[data-acao]");
     if (!btn) return;
     if (btn.dataset.acao === "editar") prepararEdicao(btn.dataset.id);
     else if (btn.dataset.acao === "remover") removerItem(btn.dataset.id);
   });
 
-  // Enter no campo de senha faz login
-  el("pwd-field")?.addEventListener("keydown", e => { if (e.key === "Enter") tentarLoginDireto(); });
+  el("pwd-field")?.addEventListener("keydown", e => {
+    if (e.key === "Enter") tentarLoginDireto();
+  });
 
-  // Restaura o login salvo, se ainda for válido
+  // Restaura sessão salva no sessionStorage, se existir
   try {
-    const salvo = JSON.parse(sessionStorage.getItem("thales_sessao") || "null");
-    if (salvo && salvo.token) {
-      const res = await fetch(`${GAS_URL}?sheet=inventario&token=${encodeURIComponent(salvo.token)}`);
-      const r = await res.json();
-      if (Array.isArray(r)) {
-        token = salvo.token;
-        usuarioAtual = { nome: salvo.nome };
+    const salva = sessionStorage.getItem("thales_sessao");
+    if (salva) {
+      const parsed = JSON.parse(salva);
+      if (parsed && parsed.token && parsed.nome) {
+        token = parsed.token;
+        usuarioAtual = { nome: parsed.nome };
         iniciarSessao();
-      } else {
-        sessionStorage.removeItem("thales_sessao");
       }
     }
   } catch (err) {
-    sessionStorage.removeItem("thales_sessao");
+    console.warn("Não foi possível restaurar a sessão:", err);
   }
 });
