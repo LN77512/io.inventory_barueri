@@ -203,7 +203,7 @@ function fecharModalGrafico() {
   esconder("chart-modal");
 }
 
-/* ---------- Gráfico de itens críticos por marca ---------- */
+/* ---------- Gráfico de itens críticos (Nome + Marca + Modelo) ---------- */
 function listarCriticosDetalhado(data) {
   const grupos = agrupar(data);
   const vistos = {};
@@ -219,11 +219,17 @@ function listarCriticosDetalhado(data) {
     const disp = g.estoque - g.uso - g.manut;
     if (disp <= 5 && g.alerta !== "nao") {
       const dispSeguro = Math.max(0, disp);
-      const marcaLimpa = String(item.marca || "Sem Marca").trim();
+      const nomeLimpo = String(item.nome || "").trim();
+      const marcaLimpa = String(item.marca || "").trim();
+      const modeloLimpo = String(item.modelo || "").trim();
+      const rotulo = `${nomeLimpo}${marcaLimpa ? " " + marcaLimpa : ""}${modeloLimpo ? " - " + modeloLimpo : ""}`;
+
       lista.push({
-        marcaKey: norm(marcaLimpa) || "sem marca",
+        chave: k,
+        nome: nomeLimpo,
         marca: marcaLimpa,
-        rotulo: `${item.nome} ${item.marca} - ${item.modelo}`,
+        modelo: modeloLimpo,
+        rotulo,
         disp: dispSeguro,
         estoque: g.estoque,
         zerado: dispSeguro === 0
@@ -247,12 +253,13 @@ function fecharModalCriticos() {
 
 function atualizarGraficoCriticos(data, filtro = el("criticos-busca")?.value || "") {
   const canvas = el("criticosChart");
-  if (!canvas) return;
+  const wrap = el("criticos-wrap");
+  if (!canvas || !wrap) return;
 
   const termo = norm(filtro);
   const todos = listarCriticosDetalhado(data);
   const filtrados = termo
-    ? todos.filter(i => norm(`${i.rotulo} ${i.marca}`).includes(termo))
+    ? todos.filter(i => norm(`${i.nome} ${i.marca} ${i.modelo} ${i.rotulo}`).includes(termo))
     : todos;
 
   if (meuGraficoCriticos) meuGraficoCriticos.destroy();
@@ -261,59 +268,51 @@ function atualizarGraficoCriticos(data, filtro = el("criticos-busca")?.value || 
   el("criticos-conteudo").style.display = filtrados.length ? "block" : "none";
   if (!filtrados.length) return;
 
-  const porMarca = {};
-  filtrados.forEach(item => {
-    const chaveMarca = item.marcaKey || "sem marca";
-    if (!porMarca[chaveMarca]) {
-      porMarca[chaveMarca] = {
-        label: item.marca || "Sem Marca",
-        qtdZerados: 0,
-        qtdBaixos: 0
-      };
-    }
-    if (item.zerado) {
-      porMarca[chaveMarca].qtdZerados += item.disp;
-    } else {
-      porMarca[chaveMarca].qtdBaixos += item.disp;
-    }
-  });
+  wrap.style.height = Math.max(240, filtrados.length * 38 + 80) + "px";
 
-  const marcasOrdenadas = Object.values(porMarca).sort((a, b) => {
-    const totA = a.qtdZerados + a.qtdBaixos;
-    const totB = b.qtdZerados + b.qtdBaixos;
-    return totB - totA || a.label.localeCompare(b.label);
-  });
+  const maxValor = Math.max(5, ...filtrados.map(i => Math.max(i.disp, i.estoque)));
 
   meuGraficoCriticos = new Chart(canvas, {
     type: "bar",
     data: {
-      labels: marcasOrdenadas.map(m => m.label),
+      labels: filtrados.map(i => i.rotulo),
       datasets: [
         {
-          label: "Zerados (0 disp.)",
-          data: marcasOrdenadas.map(m => m.qtdZerados),
-          backgroundColor: "#dc3545"
-        },
-        {
-          label: "Qtd. Disponível em Baixos (1 a 5)",
-          data: marcasOrdenadas.map(m => m.qtdBaixos),
-          backgroundColor: "#fd7e14"
+          label: "Qtd. Disponível",
+          data: filtrados.map(i => i.disp),
+          backgroundColor: filtrados.map(i => (i.zerado ? "#dc3545" : "#fd7e14")),
+          borderRadius: 4
         }
       ]
     },
     options: {
+      indexAxis: "y",
       responsive: true,
       maintainAspectRatio: false,
       plugins: {
-        legend: { position: "bottom" },
+        legend: { display: false },
         title: {
           display: true,
-          text: `${filtrados.length} item(ns) crítico(s) em ${marcasOrdenadas.length} marca(s)`
+          text: `${filtrados.length} item(ns) crítico(s) por Nome / Marca / Modelo`
+        },
+        tooltip: {
+          callbacks: {
+            label: ctx => {
+              const item = filtrados[ctx.dataIndex];
+              return `Disponível: ${item.disp} / Estoque Total: ${item.estoque}`;
+            }
+          }
         }
       },
       scales: {
-        x: { stacked: false },
-        y: { beginAtZero: true, stacked: false, ticks: { precision: 0 } }
+        x: {
+          beginAtZero: true,
+          suggestedMax: maxValor,
+          ticks: { precision: 0 }
+        },
+        y: {
+          ticks: { font: { size: 11 } }
+        }
       }
     }
   });
