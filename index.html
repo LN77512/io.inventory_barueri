@@ -480,6 +480,18 @@
         </div>
     </div>
 
+    <!-- MODAL DO GRÁFICO DE ITENS CRÍTICOS -->
+    <div id="criticos-modal" class="login-overlay" style="display: none;">
+        <div class="login-card" style="max-width: 700px;">
+            <button type="button" class="btn-fechar-modal" onclick="fecharModalCriticos()">&times;</button>
+            <h3 style="color: #002b5c; margin-top: 0;">Itens em Estoque Crítico</h3>
+            <p id="criticos-vazio" class="login-subtitle" style="display:none;">Nenhum item crítico no momento. ✅</p>
+            <div id="criticos-wrap" style="position: relative; width: 100%; height: 300px;">
+                <canvas id="criticosChart"></canvas>
+            </div>
+        </div>
+    </div>
+
     <!-- MODAL DE CONFIRMAÇÃO DE EXCLUSÃO -->
     <div id="delete-modal" class="login-overlay" style="display: none;">
         <div class="login-card">
@@ -547,6 +559,7 @@
                 <input type="text" id="search-input" placeholder="🔍 Pesquisar em qualquer coluna..." autocomplete="off">
                 <div class="export-buttons">
                     <button type="button" onclick="abrirModalGrafico()" class="btn-grafico">📈 Ver Gráfico</button>
+                    <button type="button" onclick="abrirModalCriticos()" class="btn-grafico" style="background-color:#dc3545;">🚨 Itens Críticos</button>
                     <button type="button" onclick="exportarExcel()" class="btn-excel">📊 Exportar Excel (.xlsx)</button>
                     <button type="button" onclick="exportarPDF()" class="btn-pdf">📄 Exportar PDF</button>
                 </div>
@@ -612,6 +625,6 @@
         </div>
     </div>
 
-    <script src="script.js?v=16.0"></script>
+    <script src="script.js?v=17.0"></script>
 </body>
 </html>
