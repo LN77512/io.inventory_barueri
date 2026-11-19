@@ -862,7 +862,7 @@ function exportarPDF() {
 
 /* ---------- Relatório de Críticos ---------- */
 const LIMITE_CRITICO = 5;   // disponível <= 5 = crítico
-const LIMITE_ATENCAO = 10;  // disponível de 6 a 10 = perto de ficar crítico
+const LIMITE_ATENCAO = 15;  // disponível de 6 a 10 = perto de ficar crítico
 
 function classificarNiveis(data) {
   const grupos = agrupar(data);
